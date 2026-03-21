@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pr0digy/vuln-scan/schemas/threat-model.schema.json",
+  "title": "vuln-scan Threat Model",
+  "description": "Threat model produced by Phase 2, consumed by Phases 3-7",
+  "type": "object",
+  "required": ["trust_boundaries", "assets", "attack_surfaces", "high_risk_paths", "assumptions"],
+  "properties": {
+    "trust_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "entry_points", "risk"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "entry_points": { "type": "array", "items": { "type": "string" } },
+          "risk": { "enum": ["critical", "high", "medium", "low"] }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "location", "sensitivity"],
+        "properties": {
+          "name": { "type": "string" },
+          "location": { "type": "string" },
+          "sensitivity": { "enum": ["critical", "high", "medium", "low"] }
+        }
+      }
+    },
+    "attack_surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "targets", "stride"],
+        "properties": {
+          "category": { "type": "string" },
+          "targets": { "type": "array", "items": { "type": "string" } },
+          "stride": {
+            "enum": ["spoofing", "tampering", "repudiation", "information_disclosure", "denial_of_service", "elevation_of_privilege"]
+          }
+        }
+      }
+    },
+    "high_risk_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "files", "priority"],
+        "properties": {
+          "description": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

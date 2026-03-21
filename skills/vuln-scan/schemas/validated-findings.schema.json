@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pr0digy/vuln-scan/schemas/validated-findings.schema.json",
+  "title": "vuln-scan Validated Findings",
+  "description": "Merged, deduplicated, and validated findings from Phase 7",
+  "type": "object",
+  "required": ["schema_version", "metadata", "summary", "findings"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "metadata": {
+      "type": "object",
+      "required": ["repo", "scan_date", "phases_completed", "phases_skipped", "tools_used", "tools_unavailable"],
+      "properties": {
+        "repo": { "type": "string" },
+        "scan_date": { "type": "string", "format": "date-time" },
+        "scan_duration_s": { "type": "integer", "minimum": 0 },
+        "phases_completed": { "type": "array", "items": { "type": "string" } },
+        "phases_skipped": { "type": "array", "items": { "type": "string" } },
+        "phases_failed": { "type": "array", "items": { "type": "string" } },
+        "tools_used": { "type": "array", "items": { "type": "string" } },
+        "tools_unavailable": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_findings", "by_severity", "by_confidence", "by_category"],
+      "properties": {
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "critical": { "type": "integer" },
+            "high": { "type": "integer" },
+            "medium": { "type": "integer" },
+            "low": { "type": "integer" }
+          }
+        },
+        "by_confidence": {
+          "type": "object",
+          "properties": {
+            "confirmed": { "type": "integer" },
+            "likely": { "type": "integer" },
+            "possible": { "type": "integer" }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "broken_assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assumption", "contradicted_by"],
+        "properties": {
+          "assumption": { "type": "string" },
+          "contradicted_by": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "https://github.com/pr0digy/vuln-scan/schemas/finding.schema.json" }
+    }
+  }
+}
