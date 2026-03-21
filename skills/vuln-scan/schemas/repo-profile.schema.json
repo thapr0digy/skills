@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pr0digy/vuln-scan/schemas/repo-profile.schema.json",
+  "title": "vuln-scan Repo Profile",
+  "description": "Structural profile of the target repository produced by Phase 1 (Recon)",
+  "type": "object",
+  "required": ["repo", "entry_points", "security_surface", "dependency_manifests", "available_tools"],
+  "properties": {
+    "repo": {
+      "type": "object",
+      "required": ["path", "name", "is_git", "primary_languages", "frameworks", "package_managers", "loc_estimate"],
+      "properties": {
+        "path": { "type": "string" },
+        "name": { "type": "string" },
+        "is_git": { "type": "boolean" },
+        "primary_languages": { "type": "array", "items": { "type": "string" } },
+        "frameworks": { "type": "array", "items": { "type": "string" } },
+        "package_managers": { "type": "array", "items": { "type": "string" } },
+        "loc_estimate": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "entry_points": {
+      "type": "object",
+      "properties": {
+        "api_routes": { "type": "array", "items": { "type": "string" } },
+        "cli_commands": { "type": "array", "items": { "type": "string" } },
+        "message_handlers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "security_surface": {
+      "type": "object",
+      "properties": {
+        "auth_modules": { "type": "array", "items": { "type": "string" } },
+        "input_handling": { "type": "array", "items": { "type": "string" } },
+        "crypto_usage": { "type": "array", "items": { "type": "string" } },
+        "database_access": { "type": "array", "items": { "type": "string" } },
+        "file_operations": { "type": "array", "items": { "type": "string" } },
+        "external_integrations": { "type": "array", "items": { "type": "string" } },
+        "config_files": { "type": "array", "items": { "type": "string" } },
+        "iac_files": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "dependency_manifests": { "type": "array", "items": { "type": "string" } },
+    "available_tools": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    }
+  }
+}

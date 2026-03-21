@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pr0digy/vuln-scan/schemas/finding.schema.json",
+  "title": "vuln-scan Finding",
+  "description": "Common finding format emitted by all scanning phases",
+  "type": "object",
+  "required": ["schema_version", "id", "phase", "title", "severity", "confidence", "category", "location", "description", "remediation", "source_tool"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "id": {
+      "type": "string",
+      "pattern": "^(STATIC|REVIEW|DEP|SECRET|VULN)-\\d{3,}$"
+    },
+    "phase": {
+      "enum": ["static-analysis", "code-review", "dependencies", "secrets", "validation"]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "severity": { "enum": ["critical", "high", "medium", "low"] },
+    "confidence": { "enum": ["confirmed", "likely", "possible"] },
+    "category": {
+      "enum": [
+        "broken_access_control", "crypto_failure", "injection",
+        "insecure_design", "security_misconfiguration", "vulnerable_component",
+        "auth_failure", "data_integrity_failure", "logging_monitoring_failure",
+        "ssrf", "secret_exposure"
+      ]
+    },
+    "cwe": {
+      "type": "string",
+      "pattern": "^CWE-\\d+$"
+    },
+    "location": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "file", "line_start", "line_end"],
+          "properties": {
+            "type": { "const": "source" },
+            "file": { "type": "string" },
+            "line_start": { "type": "integer", "minimum": 1 },
+            "line_end": { "type": "integer", "minimum": 1 },
+            "snippet": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "manifest_file", "package", "installed_version"],
+          "properties": {
+            "type": { "const": "dependency" },
+            "manifest_file": { "type": "string" },
+            "package": { "type": "string" },
+            "installed_version": { "type": "string" },
+            "fixed_version": { "type": ["string", "null"] },
+            "cvss": { "type": ["number", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "commit", "file_at_commit"],
+          "properties": {
+            "type": { "const": "git_history" },
+            "commit": { "type": "string" },
+            "file_at_commit": { "type": "string" },
+            "current_file": { "type": ["string", "null"] },
+            "line_start": { "type": "integer", "minimum": 1 },
+            "snippet": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "evidence": { "type": "string" },
+    "data_flow": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "line", "role", "label"],
+        "properties": {
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "role": { "enum": ["source", "transform", "sink"] },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "remediation": { "type": "string", "minLength": 1 },
+    "references": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "source_tool": { "type": "string" },
+    "correlated_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
