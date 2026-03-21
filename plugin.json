@@ -1,0 +1,15 @@
+{
+  "name": "vuln-scan",
+  "version": "0.1.0",
+  "description": "Autonomous vulnerability scanning pipeline for code repositories",
+  "author": "pr0digy",
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "vuln-scan",
+      "path": "skills/vuln-scan/SKILL.md",
+      "description": "Scan a code repository for security vulnerabilities. Runs an 8-phase pipeline: recon, threat model, static analysis, LLM code review, dependency scan, secret detection, validation, and reporting. Produces markdown + SARIF output in .vuln-scan/.",
+      "user_invocable": true
+    }
+  ]
+}
