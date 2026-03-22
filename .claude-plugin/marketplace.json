@@ -1,0 +1,21 @@
+{
+  "name": "thapr0digy",
+  "owner": {
+    "name": "thapr0digy"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Claude Code plugins for security analysis and vulnerability scanning"
+  },
+  "plugins": [
+    {
+      "name": "vuln-scan",
+      "version": "0.1.0",
+      "description": "Autonomous vulnerability scanning pipeline for code repositories. Runs an 8-phase pipeline: recon, threat model, static analysis, LLM code review, dependency scan, secret detection, validation, and reporting.",
+      "author": {
+        "name": "thapr0digy"
+      },
+      "source": "./plugins/vuln-scan"
+    }
+  ]
+}

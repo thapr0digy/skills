@@ -1,0 +1,8 @@
+{
+  "name": "vuln-scan",
+  "version": "0.1.0",
+  "description": "Autonomous vulnerability scanning pipeline for code repositories. Runs an 8-phase pipeline: recon, threat model, static analysis, LLM code review, dependency scan, secret detection, validation, and reporting.",
+  "author": {
+    "name": "thapr0digy"
+  }
+}
