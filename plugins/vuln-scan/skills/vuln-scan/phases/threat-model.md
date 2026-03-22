@@ -14,6 +14,13 @@ The repository profile from Phase 1 is provided below:
 {{REPO_PROFILE}}
 ```
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
+If the services array is non-empty, this is a monorepo scan. Apply the monorepo-specific rules in each step below.
+
 ---
 
 ## Step 1: Try the `openai-security-threat-model` Skill
@@ -64,6 +71,19 @@ For each trust boundary, assign a risk level:
 - **medium**: internal service-to-service with network exposure
 - **low**: local/internal only, no network exposure
 
+**Monorepo-specific boundaries:**
+
+If the services array is non-empty, also identify these boundary patterns:
+
+| Boundary Pattern | How to detect |
+|---|---|
+| Service A → Shared Code → Service B | A `shared` type service has multiple `consumers` — data flows through shared code cross service boundaries |
+| Service → Service (direct) | One service imports from or calls another service directly (check import patterns across service directories) |
+
+For inter-service boundaries, default risk to `medium` (internal service-to-service). Elevate to `high` if the services handle different trust levels (e.g., one is public-facing, another is internal-only).
+
+Prefix inter-service boundary names with the service names, e.g., "agent → common → box" or "console → agent API".
+
 ---
 
 ## Step 4: Apply STRIDE Per Trust Boundary
@@ -112,6 +132,14 @@ Each path must include:
 - `priority`: integer starting at 1, no ties
 
 Limit to 20 paths maximum.
+
+**Monorepo priority boost:**
+
+When ranking high-risk paths, apply this modifier:
+- Paths through shared code (`type: "shared"`) that affect 3+ consumers: boost priority by 2 positions (lower number = higher priority)
+- Cross-service data flows where data crosses from a public-facing service to an internal service: boost priority by 1 position
+
+These boosts apply after the initial ranking. Re-sort after applying.
 
 ---
 
