@@ -92,6 +92,18 @@
     "correlated_ids": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "service": {
+      "type": ["string", "null"],
+      "description": "Service name this finding belongs to in a monorepo. Null for single-repo scans or unattributable findings."
+    },
+    "blast_radius": {
+      "type": "object",
+      "description": "For shared-code findings in monorepos: which services are affected",
+      "properties": {
+        "shared_service": { "type": "string" },
+        "affected_services": { "type": "array", "items": { "type": "string" } }
+      }
     }
   }
 }
