@@ -21,6 +21,11 @@ You are a security report generation agent. Your job is to transform the validat
 {{THREAT_MODEL}}
 ```
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
 If any inline placeholder above is not populated, read the corresponding file from disk:
 - `.vuln-scan/validated-findings.json`
 - `.vuln-scan/repo-profile.json`
@@ -52,6 +57,8 @@ Write a complete markdown document to `.vuln-scan/SECURITY_REPORT.md`. Follow th
 | **Phases Failed** | {comma-separated list, or "none"} |
 | **Tools Used** | {comma-separated list} |
 | **Tools Unavailable** | {comma-separated list, or "none"} |
+| **Scan Mode** | {Monorepo (N services) | Single repository} |
+| **Services** | {comma-separated service names, or "N/A"} |
 ```
 
 ---
@@ -79,6 +86,63 @@ If `broken_assumptions` is non-empty, add a callout block immediately after the 
 ```markdown
 > **Warning:** {N} threat model assumption(s) were violated. See [Threat Model Summary](#threat-model-summary) for details.
 ```
+
+**Monorepo only:** If services are defined, add a per-service summary table:
+
+```markdown
+### Service Breakdown
+
+| Service | Type | Critical | High | Medium | Low | Total |
+|---|---|---|---|---|---|---|
+| agent | service | 0 | 2 | 1 | 0 | 3 |
+| box | service | 1 | 0 | 2 | 1 | 4 |
+| common | shared | 0 | 1 | 0 | 0 | 1 |
+| **Total** | | **1** | **3** | **3** | **1** | **8** |
+```
+
+For shared code services, add a note below the table:
+
+```markdown
+> **Shared code impact:** Findings in `common` affect **agent, box, console** — vulnerabilities here have {N}x blast radius.
+```
+
+---
+
+### Monorepo report structure
+
+**Monorepo report structure:** When services are defined, restructure the findings sections (Sections 3-6) to group by service:
+
+```markdown
+## Findings by Service
+
+### agent
+
+#### Critical Findings
+{render critical findings for agent using the same format as Sections 3-6}
+
+#### High Findings
+{...}
+
+---
+
+### box
+
+#### Critical Findings
+{...}
+
+---
+
+### common (shared code)
+
+> Findings in this section affect: **agent, box, console**
+
+#### High Findings
+{finding with blast_radius rendered as:}
+> **Blast radius:** This vulnerability in shared code affects **agent, box, console**.
+{...}
+```
+
+For non-monorepo scans, use the existing flat structure (Sections 3-6 as currently defined).
 
 ---
 
@@ -478,6 +542,13 @@ For git_history findings, also add:
 
 ```json
 "commit": "{location.commit}"
+```
+
+For monorepo scans, also include in `result.properties`:
+
+```json
+"service": "{finding.service or null}",
+"blast_radius": "{finding.blast_radius if present}"
 ```
 
 #### result.fixes — Remediation
