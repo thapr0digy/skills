@@ -4,7 +4,7 @@
   "title": "vuln-scan Repo Profile",
   "description": "Structural profile of the target repository produced by Phase 1 (Recon)",
   "type": "object",
-  "required": ["repo", "entry_points", "security_surface", "dependency_manifests", "available_tools"],
+  "required": ["repo", "entry_points", "security_surface", "dependency_manifests", "available_tools", "services", "is_monorepo"],
   "properties": {
     "repo": {
       "type": "object",
@@ -44,6 +44,27 @@
     "available_tools": {
       "type": "object",
       "additionalProperties": { "type": "boolean" }
+    },
+    "services": {
+      "type": "array",
+      "description": "Detected or configured service boundaries within a monorepo",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "type"],
+        "properties": {
+          "name": { "type": "string", "description": "Service identifier (directory name or config-defined name)" },
+          "path": { "type": "string", "description": "Relative path from repo root to service directory" },
+          "type": { "enum": ["service", "shared"], "description": "Whether this is an independent service or shared code" },
+          "languages": { "type": "array", "items": { "type": "string" }, "description": "Languages detected within this service" },
+          "frameworks": { "type": "array", "items": { "type": "string" }, "description": "Frameworks detected within this service" },
+          "consumers": { "type": "array", "items": { "type": "string" }, "description": "For shared code: which services import from this directory" },
+          "dependency_manifests": { "type": "array", "items": { "type": "string" }, "description": "Manifest files within this service" }
+        }
+      }
+    },
+    "is_monorepo": {
+      "type": "boolean",
+      "description": "True if multiple services were detected or configured"
     }
   }
 }

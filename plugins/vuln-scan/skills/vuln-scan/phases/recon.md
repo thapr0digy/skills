@@ -59,7 +59,28 @@ The file must conform exactly to the schema below. Every field is required. Use 
     "cargo_audit": false,
     "bundle-audit": false,
     "composer": false
-  }
+  },
+  "is_monorepo": true,
+  "services": [
+    {
+      "name": "agent",
+      "path": "code/agent",
+      "type": "service",
+      "languages": ["typescript"],
+      "frameworks": ["express"],
+      "consumers": [],
+      "dependency_manifests": ["code/agent/package.json"]
+    },
+    {
+      "name": "common",
+      "path": "code/common",
+      "type": "shared",
+      "languages": ["typescript"],
+      "frameworks": [],
+      "consumers": ["agent", "box", "console"],
+      "dependency_manifests": ["code/common/package.json"]
+    }
+  ]
 }
 ```
 
@@ -97,6 +118,27 @@ Check whether `{{TARGET_PATH}}/.git` exists. Set `is_git` to `true` or `false` a
 ```bash
 [ -d "{{TARGET_PATH}}/.git" ] && echo "true" || echo "false"
 ```
+
+### Step 2.5 — Load monorepo configuration (if present)
+
+Check whether `{{TARGET_PATH}}/.vuln-scan/config.json` exists. If it does, read it and extract the `services` array. This file allows users to explicitly define service boundaries when auto-detection is insufficient.
+
+Expected config format:
+
+```json
+{
+  "services": [
+    { "name": "agent", "path": "code/agent", "type": "service" },
+    { "name": "box", "path": "code/box", "type": "service" },
+    { "name": "console", "path": "code/console", "type": "service" },
+    { "name": "common", "path": "code/common", "type": "shared", "consumers": ["agent", "box", "console"] }
+  ]
+}
+```
+
+If this file exists and contains a valid `services` array, use it as the authoritative service definition — skip auto-detection in Step 10. Set `is_monorepo` to `true`.
+
+If the file does not exist, proceed to auto-detection in Step 10.
 
 ### Step 3 — Detect languages
 
@@ -289,7 +331,61 @@ Map results to the `available_tools` object. Use the following key names exactly
 | `composer` | `composer` |
 | `npm` | `npm_audit` |
 
-### Step 10 — Assemble and write JSON
+### Step 10 — Detect service boundaries (monorepo auto-detection)
+
+If services were already loaded from config.json (Step 2.5), skip this step entirely.
+
+Auto-detect service boundaries by looking for service marker files in immediate subdirectories of `{{TARGET_PATH}}`. A subdirectory is considered a service if it contains ANY of:
+
+| Marker file | Indicates |
+|---|---|
+| `package.json` | Node.js service |
+| `go.mod` | Go service |
+| `Cargo.toml` | Rust service |
+| `pyproject.toml` or `requirements.txt` | Python service |
+| `pom.xml` or `build.gradle` or `build.gradle.kts` | Java service |
+| `Gemfile` | Ruby service |
+| `composer.json` | PHP service |
+| `Dockerfile` | Containerized service |
+
+Use Glob to check for these markers in immediate subdirectories (depth 1 and depth 2):
+
+```bash
+# Check depth-1 subdirectories for service markers
+for dir in $(fd --type d --max-depth 2 --min-depth 1 . "{{TARGET_PATH}}" 2>/dev/null); do
+  for marker in package.json go.mod Cargo.toml pyproject.toml requirements.txt pom.xml build.gradle Dockerfile; do
+    if [ -f "$dir/$marker" ]; then
+      echo "$dir:$marker"
+      break
+    fi
+  done
+done
+```
+
+**Classification rules:**
+
+1. If 2 or more subdirectories contain service markers → `is_monorepo = true`
+2. If only 1 or 0 subdirectories contain markers → `is_monorepo = false`, set `services = []`
+
+For each detected service directory:
+- `name`: the directory name (last path component)
+- `path`: relative path from repo root
+- `type`: default to `"service"`
+- `languages`: detect using the same logic as Step 3, scoped to this directory
+- `frameworks`: detect using the same logic as Step 4, scoped to this directory
+- `dependency_manifests`: filter the global `dependency_manifests` list to those within this service's path
+
+**Shared code detection:**
+
+After identifying services, check for directories that are imported by multiple services but are not themselves services. Use Grep to search for import patterns referencing sibling directories:
+
+For each non-service subdirectory at the same level as the detected services:
+- Search all service directories for import statements referencing this directory
+- If 2+ services import from it, classify it as `type: "shared"` with `consumers` listing the importing service names
+
+If no shared directories are found, that is fine — `consumers` is only populated for `type: "shared"` entries.
+
+### Step 11 — Assemble and write JSON
 
 Combine all results into the schema above. Double-check:
 - All required fields are present
@@ -297,6 +393,9 @@ Combine all results into the schema above. Double-check:
 - `repo.path` is the absolute path `{{TARGET_PATH}}`
 - `repo.name` is the final path component (e.g., `basename {{TARGET_PATH}}`)
 - All file paths in arrays are relative to `{{TARGET_PATH}}` (strip the leading target path prefix)
+- `is_monorepo` is a boolean
+- `services` is an array (empty `[]` for non-monorepo)
+- Each service has `name`, `path`, and `type`
 
 Write the final JSON to `{{TARGET_PATH}}/.vuln-scan/repo-profile.json`.
 
