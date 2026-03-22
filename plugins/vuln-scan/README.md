@@ -83,6 +83,41 @@ Each finding includes:
 - **CWE**: Common Weakness Enumeration ID
 - **Remediation**: actionable fix guidance
 
+## Monorepo Support
+
+vuln-scan automatically detects monorepo structures by looking for service marker files (`package.json`, `go.mod`, `Dockerfile`, etc.) in subdirectories.
+
+### Auto-Detection
+
+When vuln-scan finds 2+ subdirectories with their own dependency manifests, it treats the repo as a monorepo. Each service is scanned independently, and findings are grouped by service in the report.
+
+Shared code directories (imported by 2+ services) are detected automatically and receive blast-radius tracking — showing which services are affected by each vulnerability.
+
+### Explicit Configuration
+
+For repos where auto-detection isn't sufficient, create `.vuln-scan/config.json`:
+
+```json
+{
+  "services": [
+    { "name": "agent", "path": "code/agent", "type": "service" },
+    { "name": "box", "path": "code/box", "type": "service" },
+    { "name": "console", "path": "code/console", "type": "service" },
+    { "name": "common", "path": "code/common", "type": "shared", "consumers": ["agent", "box", "console"] }
+  ]
+}
+```
+
+This config file is preserved across scans (not deleted during cleanup).
+
+### Report Output
+
+Monorepo scans produce a unified report with:
+- Per-service severity breakdown table
+- Findings grouped by service
+- Shared code section with blast-radius indicators
+- Cross-service data flow tracking in the threat model
+
 ## License
 
 MIT
