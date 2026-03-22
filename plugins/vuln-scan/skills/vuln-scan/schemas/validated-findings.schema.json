@@ -18,7 +18,20 @@
         "phases_skipped": { "type": "array", "items": { "type": "string" } },
         "phases_failed": { "type": "array", "items": { "type": "string" } },
         "tools_used": { "type": "array", "items": { "type": "string" } },
-        "tools_unavailable": { "type": "array", "items": { "type": "string" } }
+        "tools_unavailable": { "type": "array", "items": { "type": "string" } },
+        "services": {
+          "type": "array",
+          "description": "Service definitions from repo profile (monorepo only)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string" },
+              "type": { "enum": ["service", "shared"] },
+              "consumers": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
       }
     },
     "summary": {
@@ -45,6 +58,11 @@
         },
         "by_category": {
           "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "by_service": {
+          "type": "object",
+          "description": "Finding counts grouped by service (monorepo only)",
           "additionalProperties": { "type": "integer" }
         }
       }

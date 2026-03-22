@@ -40,6 +40,11 @@ The coordinator may also pass findings inline. If the following placeholders are
 {{SECRET_FINDINGS}}
 ```
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
 ---
 
 ## Workflow
@@ -81,6 +86,10 @@ Each finding in the working array must already conform to the common finding sch
 ---
 
 ### Step 3: Deduplicate
+
+**Monorepo deduplication scope:** When services are defined, deduplication operates **within** each service independently. Findings in different services are never merged, even if they match on file + category + line range. This prevents collapsing genuinely distinct instances of the same pattern across services.
+
+Exception: Findings in `shared` code are deduplicated globally (not per-consumer), then attributed once with `service` set to the shared code service name.
 
 Group and merge findings that refer to the same underlying issue. Apply the following rules in order, one pass per rule type.
 
@@ -147,6 +156,27 @@ Do not bump severity above `high` via this mechanism (critical must be set by th
 
 ---
 
+### Step 4.5: Shared Code Blast Radius
+
+For each finding where `service` matches a service with `type: "shared"`:
+
+1. Look up the `consumers` array for that shared service.
+2. Add a `blast_radius` field to the finding:
+   ```json
+   "blast_radius": {
+     "shared_service": "common",
+     "affected_services": ["agent", "box", "console"]
+   }
+   ```
+3. If the finding's severity is `medium` and it affects 3+ consumers, bump severity to `high`.
+4. If the finding's severity is `low` and it affects 3+ consumers, bump severity to `medium`.
+
+This elevation reflects that a vulnerability in shared code has multiplied impact.
+
+**Ordering:** Blast radius elevation (Step 4.5) runs AFTER threat model cross-reference (Step 4). Compound elevation is allowed — a finding can be bumped by both mechanisms. However, severity must never exceed `critical` regardless of how many elevations apply.
+
+---
+
 ### Step 5: Validate Threat Model Assumptions
 
 Read `assumptions` from the threat model. For each assumption:
@@ -190,6 +220,9 @@ Compute the following from the final findings array after Step 6:
 - `by_category`: count findings by `category` field (use exact category key strings)
 
 Initialize all counts to 0. Only include categories that have at least one finding.
+
+If services are defined, also compute:
+- `by_service`: count findings by `service` field value. Include a key for each service name and a `"unattributed"` key for findings with `service: null`.
 
 ---
 
@@ -241,7 +274,20 @@ The output file must be a valid JSON object conforming to this schema:
         "phases_skipped": { "type": "array", "items": { "type": "string" } },
         "phases_failed": { "type": "array", "items": { "type": "string" } },
         "tools_used": { "type": "array", "items": { "type": "string" } },
-        "tools_unavailable": { "type": "array", "items": { "type": "string" } }
+        "tools_unavailable": { "type": "array", "items": { "type": "string" } },
+        "services": {
+          "type": "array",
+          "description": "Service definitions from repo profile (monorepo only)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string" },
+              "type": { "enum": ["service", "shared"] },
+              "consumers": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
       }
     },
     "summary": {
@@ -268,6 +314,11 @@ The output file must be a valid JSON object conforming to this schema:
         },
         "by_category": {
           "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "by_service": {
+          "type": "object",
+          "description": "Finding counts grouped by service (monorepo only)",
           "additionalProperties": { "type": "integer" }
         }
       }
@@ -379,7 +430,19 @@ Each finding in the `findings` array must conform to the common finding schema:
     "remediation": { "type": "string", "minLength": 1 },
     "references": { "type": "array", "items": { "type": "string" } },
     "source_tool": { "type": "string" },
-    "correlated_ids": { "type": "array", "items": { "type": "string" } }
+    "correlated_ids": { "type": "array", "items": { "type": "string" } },
+    "service": {
+      "type": ["string", "null"],
+      "description": "Service name this finding belongs to in a monorepo. Null for single-repo scans or unattributable findings."
+    },
+    "blast_radius": {
+      "type": "object",
+      "description": "For shared-code findings in monorepos: which services are affected",
+      "properties": {
+        "shared_service": { "type": "string" },
+        "affected_services": { "type": "array", "items": { "type": "string" } }
+      }
+    }
   }
 }
 ```
