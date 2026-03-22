@@ -37,14 +37,22 @@ Then use Glob to check that the directory contains at least one source file (any
 
 ## Step 3 — Setup Output Directory
 
+Check whether `{TARGET_PATH}/.vuln-scan/config.json` exists (this file is user-created, NOT generated). If it exists, preserve it across the cleanup.
+
 Execute the following using the Bash tool. Run these as a single shell script block.
 
 ```bash
-# Remove any previous scan output
+# Preserve user config if it exists
+[ -f "{TARGET_PATH}/.vuln-scan/config.json" ] && cp "{TARGET_PATH}/.vuln-scan/config.json" "$TMPDIR/vuln-scan-config.json"
+
+# Remove previous scan output
 rm -rf "{TARGET_PATH}/.vuln-scan"
 
 # Create fresh output directories
 mkdir -p "{TARGET_PATH}/.vuln-scan/findings"
+
+# Restore user config if it was preserved
+[ -f "$TMPDIR/vuln-scan-config.json" ] && cp "$TMPDIR/vuln-scan-config.json" "{TARGET_PATH}/.vuln-scan/config.json"
 ```
 
 Then check whether `.vuln-scan` is listed in `{TARGET_PATH}/.gitignore`. If the file does not exist, or if `.vuln-scan` is not present in it, append `.vuln-scan` as a new line. Use the Read tool to read `.gitignore` first, then Write or Edit to update it — only modify `.gitignore`, no other files.
@@ -80,9 +88,10 @@ Initialize the scan log by writing the following JSON line to `{TARGET_PATH}/.vu
 
 1. Use the Read tool to read `{SKILL_DIR}/phases/threat-model.md`.
 2. Replace every occurrence of `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
-3. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 2 threat model"`.
-4. Wait for the subagent to return.
-5. Use the Read tool to load `{TARGET_PATH}/.vuln-scan/threat-model.json`.
+3. Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
+4. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 2 threat model"`.
+5. Wait for the subagent to return.
+6. Use the Read tool to load `{TARGET_PATH}/.vuln-scan/threat-model.json`.
    - **If the file exists and is valid JSON:** store its contents as `THREAT_MODEL`. Append a `completed` log entry.
    - **If the file is missing or invalid:** store `THREAT_MODEL` as the string `{}`. Append a `failed` log entry with `"reason": "threat model output missing, continuing with empty model"`. Do not abort — partial results are acceptable.
 
@@ -103,6 +112,7 @@ Use the Read tool four times (may be parallelized) to load:
 For each loaded text, perform the following replacements (skip a replacement if that placeholder does not appear in the file):
 - Replace `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
 - Replace `{{THREAT_MODEL}}` with the contents of `THREAT_MODEL`.
+- Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
 
 ### 6b — Dispatch all four agents in a single message
 
@@ -139,6 +149,7 @@ Do not abort if one or more of these phases fail — proceed to validation with 
 2. Perform these replacements:
    - Replace `{{THREAT_MODEL}}` with the contents of `THREAT_MODEL`.
    - Replace `{{FINDINGS_DIR}}` with the path `{TARGET_PATH}/.vuln-scan/findings`.
+   - Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
 
 3. For each findings file, attempt to read it with the Read tool. If the file exists, replace the corresponding placeholder with its contents. If the file does not exist, leave the placeholder as-is (the validation phase prompt handles absent data gracefully).
 
@@ -166,6 +177,7 @@ Do not abort if one or more of these phases fail — proceed to validation with 
    - Replace `{{VALIDATED_FINDINGS}}` with the contents of `VALIDATED_FINDINGS`.
    - Replace `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
    - Replace `{{THREAT_MODEL}}` with the contents of `THREAT_MODEL`.
+   - Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
 3. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 8 reporting"`.
 4. Wait for the subagent to return.
 5. Append a `completed` or `failed` log entry to `scan.log`.
@@ -192,6 +204,17 @@ Reports written to:
 
 Scan log: {TARGET_PATH}/.vuln-scan/scan.log
 ```
+
+If the repo profile's `is_monorepo` is `true`, also display:
+
+```
+Service breakdown:
+  {service_name}: {count} findings
+  {service_name}: {count} findings
+  shared ({shared_name}): {count} findings (affects: {consumers list})
+```
+
+Read the `by_service` counts from `validated-findings.json`'s summary section.
 
 If `validated-findings.json` is absent or unparseable, omit the findings summary section and note that validation output was unavailable.
 
