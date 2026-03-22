@@ -19,6 +19,22 @@ Extract the following from the profile:
 - `dependency_manifests` — list of manifest file paths (relative to repo root)
 - `available_tools` — which audit tools are present in `$PATH`
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
+### Service Attribution
+
+If the services array is non-empty, each finding must include a `service` field. Determine the service by matching the finding's file path against service paths:
+
+1. For each finding, extract the file path (`location.file`, `location.manifest_file`, or `location.file_at_commit`).
+2. Check which service path is a prefix of the file path. Use the longest matching prefix (most specific service).
+3. Set `finding.service` to the matching service's `name`.
+4. If no service path matches, set `finding.service` to `null`.
+
+If the services array is empty (not a monorepo), omit the `service` field entirely from findings.
+
 ---
 
 ## Output
@@ -293,6 +309,8 @@ cd "{manifest_dir}" && gradle dependencyCheckAnalyze 2>/dev/null
 The JSON report is written to `build/reports/dependency-check-report.json` by default. Read that file after the command completes.
 
 ### Step 4 — Parse tool output and map to findings
+
+For dependency findings, determine `service` by matching `location.manifest_file` against service paths. A manifest at `code/agent/package.json` belongs to the `agent` service.
 
 For each tool's JSON output, parse vulnerabilities into finding objects. Rules for each tool:
 

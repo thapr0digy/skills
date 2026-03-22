@@ -20,6 +20,22 @@ You operate autonomously. Do not prompt the user for input at any point. Make al
 {{THREAT_MODEL}}
 ```
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
+### Service Attribution
+
+If the services array is non-empty, each finding must include a `service` field. Determine the service by matching the finding's file path against service paths:
+
+1. For each finding, extract the file path (`location.file`, `location.manifest_file`, or `location.file_at_commit`).
+2. Check which service path is a prefix of the file path. Use the longest matching prefix (most specific service).
+3. Set `finding.service` to the matching service's `name`.
+4. If no service path matches, set `finding.service` to `null`.
+
+If the services array is empty (not a monorepo), omit the `service` field entirely from findings.
+
 ---
 
 ## External Skills
@@ -77,6 +93,8 @@ For each path in your working list (in priority order):
 5. When a source-to-sink path is traceable, record a `data_flow` array (see schema below).
 6. Record all findings for this path before moving to the next.
 
+**Monorepo context:** When tracing data flows, pay special attention to flows that cross service boundaries (file path moves from one service's directory to another or through shared code). Cross-service data flows are higher risk because they often cross trust boundaries with different auth/validation assumptions. Tag these findings with the service where the **sink** (vulnerability point) resides.
+
 ### Step 3: Context Budget Check
 
 After completing each high-risk path, evaluate your remaining context capacity:
@@ -118,6 +136,7 @@ Apply these rules to every finding you record:
   - `"likely"` — suspicious pattern that strongly suggests a vulnerability, but you cannot fully trace the complete data flow
   - `"possible"` — best-practice deviation or pattern that could indicate a vulnerability, but exploitability is unclear
 - **`data_flow`**: Include when the source-to-sink path is traceable. Use roles `source`, `transform`, `sink`. The `transform` role is optional — use it when data passes through an intermediate function worth noting (e.g., partial sanitization that is insufficient).
+- **`service`**: Resolve using Service Attribution logic. For cross-service data flows, attribute to the service containing the sink.
 - **`correlated_ids`**: Omit from Phase 4 output. This field is added by Phase 7 only.
 
 ---

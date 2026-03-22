@@ -22,6 +22,22 @@ Extract the following from the profile:
 - `available_tools.trufflehog` — whether trufflehog is available
 - `available_tools.gitleaks` — whether gitleaks is available
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
+### Service Attribution
+
+If the services array is non-empty, each finding must include a `service` field. Determine the service by matching the finding's file path against service paths:
+
+1. For each finding, extract the file path (`location.file`, `location.manifest_file`, or `location.file_at_commit`).
+2. Check which service path is a prefix of the file path. Use the longest matching prefix (most specific service).
+3. Set `finding.service` to the matching service's `name`.
+4. If no service path matches, set `finding.service` to `null`.
+
+If the services array is empty (not a monorepo), omit the `service` field entirely from findings.
+
 ---
 
 ## Output
@@ -340,6 +356,8 @@ For each raw finding from either tool:
 4. **Check for duplicates** (trufflehog only, when running both git and filesystem scans): two findings are duplicates if they share the same `file`, `line`, and `DetectorName`. Keep the one with `Verified: true` if either is verified; otherwise keep either.
 
 ### Step 4 — Map to finding schema
+
+For secret findings, determine `service` by matching `location.file` (for source findings) or `location.file_at_commit` (for git_history findings) against service paths.
 
 For each deduplicated finding, construct a finding object:
 

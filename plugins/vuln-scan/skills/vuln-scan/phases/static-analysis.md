@@ -18,6 +18,22 @@ You receive the following data inline (do not read these from disk):
 {{THREAT_MODEL}}
 ```
 
+**Services (monorepo context):**
+```json
+{{SERVICES}}
+```
+
+### Service Attribution
+
+If the services array is non-empty, each finding must include a `service` field. Determine the service by matching the finding's file path against service paths:
+
+1. For each finding, extract the file path (`location.file`, `location.manifest_file`, or `location.file_at_commit`).
+2. Check which service path is a prefix of the file path. Use the longest matching prefix (most specific service).
+3. Set `finding.service` to the matching service's `name`.
+4. If no service path matches, set `finding.service` to `null`.
+
+If the services array is empty (not a monorepo), omit the `service` field entirely from findings.
+
 ---
 
 ## Workflow
@@ -185,6 +201,7 @@ Map from Semgrep CWE tags (`metadata.cwe`) or OWASP tags (`metadata.owasp`) to t
 | `remediation` | Semgrep `extra.metadata.fix` if present; otherwise construct from rule metadata message or use `"Refer to rule documentation: <rule_url>"` |
 | `references` | Build from `metadata.references` array if present; always append the CWE URL if a CWE is present (e.g., `https://cwe.mitre.org/data/definitions/89.html`) |
 | `source_tool` | Always `"semgrep"` |
+| `service` | Resolve using Service Attribution logic above. Match `location.file` against service paths. |
 
 Do not include `data_flow` (Semgrep does not provide structured data flow). Do not include `correlated_ids` (added by Phase 7).
 
