@@ -1,0 +1,8 @@
+{
+  "name": "dep-graph",
+  "version": "0.1.0",
+  "description": "Scans a parent directory of git repositories and generates an interactive D3.js dependency graph showing cross-repo relationships.",
+  "author": {
+    "name": "thapr0digy"
+  }
+}

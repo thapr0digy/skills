@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dependency Graph</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; overflow: hidden; }
+svg { width: 100vw; height: 100vh; display: block; }
+
+#controls {
+  position: fixed; top: 16px; left: 16px; z-index: 10;
+  background: rgba(26, 26, 46, 0.92); border: 1px solid #333; border-radius: 8px;
+  padding: 14px 16px; min-width: 220px; font-size: 13px;
+  backdrop-filter: blur(8px);
+}
+#controls h3 { font-size: 14px; margin-bottom: 10px; color: #8be9fd; }
+#controls label { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; }
+#controls input[type=checkbox] { accent-color: #8be9fd; }
+#search { width: 100%; padding: 5px 8px; margin-top: 8px; background: #16213e; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
+#search::placeholder { color: #666; }
+.ctrl-btn { margin-top: 4px; padding: 5px 10px; background: #333; border: 1px solid #555; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 12px; width: 100%; }
+.ctrl-btn:hover { background: #444; }
+.ctrl-btn.active { background: #1a3a5c; border-color: #2196F3; color: #8be9fd; }
+.export-btn { margin-top: 4px; padding: 4px 10px; background: #1a3a5c; border: 1px solid #2196F3; border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px; width: 100%; }
+.export-btn:hover { background: #234b6e; }
+
+#back-btn {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
+  padding: 8px 24px; background: rgba(33, 150, 243, 0.9); border: none; border-radius: 6px;
+  color: #fff; cursor: pointer; font-size: 14px; font-weight: 600; display: none;
+  backdrop-filter: blur(8px); transition: opacity 0.2s;
+}
+#back-btn:hover { background: rgba(33, 150, 243, 1); }
+
+#legend {
+  position: fixed; bottom: 40px; left: 16px; z-index: 10;
+  background: rgba(26, 26, 46, 0.92); border: 1px solid #333; border-radius: 8px;
+  padding: 12px 14px; font-size: 12px;
+  backdrop-filter: blur(8px);
+}
+#legend h4 { font-size: 13px; margin-bottom: 8px; color: #8be9fd; }
+.legend-item { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+.legend-line { width: 28px; height: 0; border-top-width: 2px; flex-shrink: 0; }
+
+#tooltip {
+  position: fixed; z-index: 20; pointer-events: none;
+  background: rgba(22, 33, 62, 0.95); border: 1px solid #444; border-radius: 6px;
+  padding: 10px 12px; font-size: 12px; max-width: 320px; display: none;
+  backdrop-filter: blur(6px);
+}
+#tooltip .tt-name { font-size: 14px; font-weight: 600; color: #8be9fd; margin-bottom: 4px; }
+#tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
+#tooltip .tt-label { color: #888; }
+#tooltip .tt-value { color: #e0e0e0; text-align: right; }
+
+#details {
+  position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; z-index: 15;
+  background: rgba(26, 26, 46, 0.96); border-left: 1px solid #333;
+  padding: 20px; overflow-y: auto; transition: right 0.25s ease;
+  backdrop-filter: blur(8px);
+}
+#details.open { right: 0; }
+#details h3 { font-size: 16px; color: #8be9fd; margin-bottom: 12px; }
+#details .close-btn { position: absolute; top: 12px; right: 14px; cursor: pointer; color: #888; font-size: 18px; }
+#details .close-btn:hover { color: #fff; }
+#details .detail-section { margin-bottom: 14px; }
+#details .detail-section h4 { font-size: 13px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+#details .dep-list { list-style: none; padding: 0; }
+#details .dep-list li { padding: 3px 0; font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+#details .dep-list li:hover { color: #8be9fd; }
+#details .dep-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+#details .tree-btn { margin-top: 8px; padding: 6px 12px; background: #1a3a5c; border: 1px solid #2196F3; border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px; width: 100%; }
+#details .tree-btn:hover { background: #234b6e; }
+
+#footer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; height: 30px;
+  background: rgba(26, 26, 46, 0.9); border-top: 1px solid #333;
+  display: flex; align-items: center; justify-content: center; gap: 24px;
+  font-size: 11px; color: #666;
+}
+
+.node-label { font-size: 12px; fill: #ccc; text-anchor: middle; pointer-events: none; font-weight: 500; }
+.node circle { cursor: pointer; stroke-width: 2px; transition: opacity 0.3s; }
+.node .external { cursor: pointer; stroke-width: 2px; }
+.link { fill: none; transition: opacity 0.3s; cursor: pointer; }
+.edge-hitbox { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; pointer-events: stroke; }
+.edge-node-link { cursor: pointer; color: #8be9fd; transition: color 0.15s; }
+.edge-node-link:hover { color: #fff; text-decoration: underline; }
+.edge-meta-section { margin-bottom: 10px; }
+.edge-meta-section h4 { font-size: 13px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.edge-meta-list { list-style: none; padding: 0; }
+.edge-meta-list li { padding: 2px 0; font-size: 12px; font-family: monospace; color: #ccc; }
+.arrow { fill-opacity: 0.6; }
+.cycle-edge { animation: cycle-pulse 2s ease-in-out infinite; }
+@keyframes cycle-pulse { 0%, 100% { stroke-opacity: 0.9; } 50% { stroke-opacity: 0.4; } }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <h3>Filters</h3>
+  <label><input type="checkbox" class="edge-filter" value="package" checked> Package imports</label>
+  <label><input type="checkbox" class="edge-filter" value="api" checked> API calls</label>
+  <label><input type="checkbox" class="edge-filter" value="shared" checked> Shared libraries</label>
+  <label><input type="checkbox" class="edge-filter" value="infra" checked> Docker / Infra</label>
+  <hr style="border-color:#333;margin:8px 0">
+  <label><input type="checkbox" id="show-externals"> External dependencies</label>
+  <input type="text" id="search" placeholder="Search repos...">
+  <button class="ctrl-btn" id="reset-btn">Reset view</button>
+  <hr style="border-color:#333;margin:8px 0">
+  <button class="export-btn" id="export-svg">Export SVG</button>
+  <button class="export-btn" id="export-png">Export PNG</button>
+</div>
+
+<button id="back-btn">Back to overview</button>
+
+<div id="legend">
+  <h4>Languages</h4>
+  <div id="lang-legend"></div>
+  <h4 style="margin-top:10px">Edge Types</h4>
+  <div class="legend-item"><span class="legend-line" style="border-top:2px solid #4CAF50"></span> Package</div>
+  <div class="legend-item"><span class="legend-line" style="border-top:2px dashed #FF9800"></span> API</div>
+  <div class="legend-item"><span class="legend-line" style="border-top:2px solid #9C27B0"></span> Shared</div>
+  <div class="legend-item"><span class="legend-line" style="border-top:2px dotted #2196F3"></span> Infra</div>
+  <div class="legend-item"><span class="legend-line" style="border-top:3px dashed #ff5252"></span> Circular dep</div>
+</div>
+
+<div id="tooltip"></div>
+
+<div id="details">
+  <span class="close-btn" id="close-details">&times;</span>
+  <div id="details-content"></div>
+</div>
+
+<div id="footer"></div>
+
+<svg id="graph"></svg>
+
+<script>
+const graphData = /*__GRAPH_DATA__*/ {"nodes":[],"edges":[],"metadata":{}} /*__END_GRAPH_DATA__*/;
+
+const langColors = {
+  go: "#00ADD8", typescript: "#3178C6", javascript: "#F7DF1E", python: "#3776AB",
+  rust: "#DEA584", java: "#ED8B00", ruby: "#CC342D", php: "#777BB4",
+  csharp: "#239120", swift: "#FA7343", kotlin: "#7F52FF", scala: "#DC322F",
+  hcl: "#5C4EE5", shell: "#89E051", c: "#555555", yaml: "#cb171e",
+  markdown: "#083fa1", unknown: "#666666"
+};
+
+const edgeStyles = {
+  package: { color: "#4CAF50", dash: "", width: 2.5 },
+  api:     { color: "#FF9800", dash: "8,4", width: 2 },
+  shared:  { color: "#9C27B0", dash: "", width: 1.5 },
+  infra:   { color: "#2196F3", dash: "3,5", width: 2 }
+};
+
+const svgEl = d3.select("#graph");
+const width = window.innerWidth;
+const height = window.innerHeight;
+svgEl.attr("viewBox", [0, 0, width, height]);
+
+const defs = svgEl.append("defs");
+Object.entries(edgeStyles).forEach(([type, s]) => {
+  defs.append("marker")
+    .attr("id", `arrow-${type}`)
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 22).attr("refY", 0)
+    .attr("markerWidth", 6).attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L10,0L0,4Z")
+    .attr("fill", s.color)
+    .attr("class", "arrow");
+});
+
+const g = svgEl.append("g");
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 5])
+  .on("zoom", (e) => g.attr("transform", e.transform));
+svgEl.call(zoom);
+
+const allNodes = graphData.nodes.map(d => ({ ...d }));
+const allEdges = graphData.edges.map(d => ({ ...d }));
+
+const nodeRadius = (d) => {
+  if (d.is_external) return 8;
+  if (!d.loc_estimate || d.loc_estimate === 0) return 12;
+  return Math.max(10, Math.min(35, Math.sqrt(d.loc_estimate / 300)));
+};
+
+const displayName = (d) => {
+  const name = d.slug || d.label || d.id;
+  return name.length > 32 ? name.slice(0, 30) + ".." : name;
+};
+
+// --- Hierarchical layout computation ---
+function computeHierarchy(nodes, edges) {
+  const inDeg = {};
+  const outAdj = {};
+  nodes.forEach(n => { inDeg[n.id] = 0; outAdj[n.id] = []; });
+
+  // Only use package + api edges for hierarchy (strongest signal)
+  const hierEdges = edges.filter(e => e.type === "package" || e.type === "api");
+  hierEdges.forEach(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    if (inDeg[tid] !== undefined) inDeg[tid]++;
+    if (outAdj[sid]) outAdj[sid].push(tid);
+  });
+
+  // BFS from roots (highest in-degree = top of hierarchy, i.e. most depended-on)
+  // Invert: nodes with most inbound edges are at the top
+  const depth = {};
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Rank by in-degree descending — highest in-degree = depth 0 (top)
+  const sorted = [...nodes].sort((a, b) => (inDeg[b.id] || 0) - (inDeg[a.id] || 0));
+
+  // BFS from the most depended-on node outward
+  const visited = new Set();
+  const queue = [];
+
+  // Start from nodes with highest in-degree (cloud, common, etc.)
+  sorted.forEach(n => {
+    if (!visited.has(n.id) && (inDeg[n.id] || 0) > 0) {
+      depth[n.id] = 0;
+      visited.add(n.id);
+      queue.push(n.id);
+    }
+  });
+
+  // BFS: dependents are placed below their dependencies
+  while (queue.length) {
+    const id = queue.shift();
+    // Find all nodes that depend on `id` (id is in their target)
+    hierEdges.forEach(e => {
+      const sid = e.source.id || e.source;
+      const tid = e.target.id || e.target;
+      if (tid === id && !visited.has(sid)) {
+        depth[sid] = (depth[id] || 0) + 1;
+        visited.add(sid);
+        queue.push(sid);
+      }
+    });
+  }
+
+  // Unvisited nodes (isolated) get max depth + 1
+  const maxD = Math.max(...Object.values(depth), 0);
+  nodes.forEach(n => {
+    if (depth[n.id] === undefined) depth[n.id] = maxD + 1;
+  });
+
+  return depth;
+}
+
+// --- State ---
+let currentView = "overview"; // "overview" or "tree"
+let visibleNodes = [];
+let visibleEdges = [];
+
+function getVisibleData() {
+  const activeTypes = new Set();
+  d3.selectAll(".edge-filter").each(function() { if (this.checked) activeTypes.add(this.value); });
+  const showExt = d3.select("#show-externals").property("checked");
+
+  const vNodes = allNodes.filter(n => !(n.is_external && !showExt));
+  const vIds = new Set(vNodes.map(n => n.id));
+  const vEdges = allEdges.filter(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    return vIds.has(sid) && vIds.has(tid) && activeTypes.has(e.type);
+  });
+  return { nodes: vNodes, edges: vEdges, ids: vIds };
+}
+
+// --- Rendering ---
+const linkGroup = g.append("g").attr("class", "links");
+const nodeGroup = g.append("g").attr("class", "nodes");
+const tooltip = d3.select("#tooltip");
+
+let simulation = null;
+let linkSel, nodeSel;
+
+function render() {
+  const { nodes, edges, ids } = getVisibleData();
+  visibleNodes = nodes;
+  visibleEdges = edges;
+
+  const depth = computeHierarchy(nodes, edges);
+  const maxDepth = Math.max(...Object.values(depth), 1);
+
+  // Group nodes by depth level for horizontal spacing
+  const levels = {};
+  nodes.forEach(n => {
+    const d = depth[n.id] || 0;
+    if (!levels[d]) levels[d] = [];
+    levels[d].push(n);
+  });
+
+  const levelSpacing = Math.min(180, (height - 120) / (maxDepth + 2));
+  const padding = 260; // left padding for controls
+
+  // Assign initial positions based on hierarchy
+  Object.entries(levels).forEach(([lvl, lvlNodes]) => {
+    const y = 80 + (+lvl) * levelSpacing;
+    const availWidth = width - padding - 100;
+    const xSpacing = Math.max(80, availWidth / (lvlNodes.length + 1));
+    lvlNodes.forEach((n, i) => {
+      n.x = padding + (i + 1) * xSpacing;
+      n.y = y;
+    });
+  });
+
+  // Clear previous
+  linkGroup.selectAll("*").remove();
+  nodeGroup.selectAll("*").remove();
+
+  // Links
+  linkSel = linkGroup.selectAll("line")
+    .data(edges, d => `${d.source.id||d.source}-${d.target.id||d.target}-${d.type}`)
+    .join("line")
+    .attr("class", "link")
+    .attr("stroke", d => d.in_cycle ? "#ff5252" : (edgeStyles[d.type]?.color || "#555"))
+    .attr("stroke-width", d => {
+      if (d.in_cycle) return 3;
+      return edgeStyles[d.type]?.width || 1.5;
+    })
+    .attr("stroke-dasharray", d => d.in_cycle ? "12,4" : (edgeStyles[d.type]?.dash || ""))
+    .attr("stroke-opacity", 0.6)
+    .attr("marker-end", d => `url(#arrow-${d.type})`);
+
+  // Edge hitbox lines for easier clicking
+  const hitboxSel = linkGroup.selectAll(".edge-hitbox")
+    .data(edges, d => `hb-${d.source.id||d.source}-${d.target.id||d.target}-${d.type}`)
+    .join("line")
+    .attr("class", "edge-hitbox");
+
+  // Edge tooltips + click (on hitbox for easier targeting)
+  hitboxSel.on("mouseenter", (e, d) => {
+    let html = `<div class="tt-name">${d.type} dependency</div>`;
+    const sn = allNodes.find(n => n.id === (d.source.id || d.source));
+    const tn = allNodes.find(n => n.id === (d.target.id || d.target));
+    html += `<div class="tt-row"><span class="tt-label">From</span><span class="tt-value">${displayName(sn || {id: d.source.id || d.source})}</span></div>`;
+    html += `<div class="tt-row"><span class="tt-label">To</span><span class="tt-value">${displayName(tn || {id: d.target.id || d.target})}</span></div>`;
+    if (d.weight > 1) html += `<div class="tt-row"><span class="tt-label">Weight</span><span class="tt-value">${d.weight}</span></div>`;
+    if (d.in_cycle) html += `<div class="tt-row"><span class="tt-label" style="color:#ff5252">Circular</span><span class="tt-value" style="color:#ff5252">Yes</span></div>`;
+    html += `<div style="margin-top:4px;font-size:11px;color:#666">Click for details</div>`;
+    tooltip.html(html).style("display", "block");
+    // Highlight this edge
+    linkSel.style("opacity", l => l === d ? 1 : 0.15);
+  })
+  .on("mousemove", (e) => tooltip.style("left", (e.clientX+14)+"px").style("top", (e.clientY-10)+"px"))
+  .on("mouseleave", () => { tooltip.style("display", "none"); linkSel.style("opacity", 0.6); })
+  .on("click", (e, d) => { e.stopPropagation(); tooltip.style("display", "none"); showEdgeDetails(d); });
+
+  // Nodes
+  nodeSel = nodeGroup.selectAll("g")
+    .data(nodes, d => d.id)
+    .join("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${d.x},${d.y})`)
+    .call(d3.drag().on("start", dragStart).on("drag", dragging).on("end", dragEnd));
+
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    if (d.is_external) {
+      const r = 8;
+      el.append("polygon")
+        .attr("class", "external")
+        .attr("points", `0,${-r} ${r},0 0,${r} ${-r},0`)
+        .attr("fill", langColors[d.primary_language] || langColors.unknown)
+        .attr("stroke", "#fff").attr("stroke-opacity", 0.3);
+    } else {
+      el.append("circle")
+        .attr("r", nodeRadius(d))
+        .attr("fill", langColors[d.primary_language] || langColors.unknown)
+        .attr("stroke", "#fff").attr("stroke-opacity", 0.4);
+    }
+  });
+
+  // Vuln badges
+  nodeSel.each(function(d) {
+    if (!d.vulnerability_counts || !d.vulnerability_counts.total) return;
+    const el = d3.select(this);
+    const r = d.is_external ? 8 : nodeRadius(d);
+    let badgeColor = "#4CAF50";
+    if (d.vulnerability_counts.medium > 0) badgeColor = "#FF9800";
+    if (d.vulnerability_counts.high > 0) badgeColor = "#f44336";
+    if (d.vulnerability_counts.critical > 0) badgeColor = "#d32f2f";
+    el.append("circle").attr("cx", r-2).attr("cy", -r+2).attr("r", 9)
+      .attr("fill", badgeColor).attr("stroke", "#1a1a2e").attr("stroke-width", 2);
+    el.append("text").attr("x", r-2).attr("y", -r+6)
+      .attr("text-anchor", "middle").attr("fill", "#fff")
+      .attr("font-size", "10px").attr("font-weight", "bold")
+      .attr("pointer-events", "none")
+      .text(d.vulnerability_counts.total);
+  });
+
+  // Labels
+  nodeSel.append("text")
+    .attr("class", "node-label")
+    .attr("dy", d => (d.is_external ? 8 : nodeRadius(d)) + 16)
+    .text(d => displayName(d));
+
+  // Node tooltips
+  nodeSel.on("mouseenter", (e, d) => {
+    const inb = edges.filter(l => (l.target.id||l.target) === d.id).length;
+    const outb = edges.filter(l => (l.source.id||l.source) === d.id).length;
+    let html = `<div class="tt-name">${displayName(d)}</div>`;
+    if (d.slug) html += `<div class="tt-row"><span class="tt-label">Repo</span><span class="tt-value">${d.slug}</span></div>`;
+    if (d.primary_language) html += `<div class="tt-row"><span class="tt-label">Language</span><span class="tt-value">${d.primary_language}</span></div>`;
+    if (d.frameworks?.length) html += `<div class="tt-row"><span class="tt-label">Frameworks</span><span class="tt-value">${d.frameworks.join(", ")}</span></div>`;
+    if (d.loc_estimate) html += `<div class="tt-row"><span class="tt-label">LOC</span><span class="tt-value">${d.loc_estimate.toLocaleString()}</span></div>`;
+    if (d.vulnerability_counts?.total) {
+      const vc = d.vulnerability_counts;
+      html += `<div class="tt-row"><span class="tt-label">Vulns</span><span class="tt-value" style="color:#f44336">${vc.critical||0}C / ${vc.high||0}H / ${vc.medium||0}M / ${vc.low||0}L</span></div>`;
+    }
+    html += `<div class="tt-row"><span class="tt-label">Deps in / out</span><span class="tt-value">${inb} / ${outb}</span></div>`;
+    if (d.is_external) html += `<div class="tt-row"><span class="tt-label">Type</span><span class="tt-value">External</span></div>`;
+    html += `<div style="margin-top:6px;font-size:11px;color:#666">Click for details &middot; Double-click for tree view</div>`;
+    tooltip.html(html).style("display", "block");
+  })
+  .on("mousemove", (e) => tooltip.style("left", (e.clientX+14)+"px").style("top", (e.clientY-10)+"px"))
+  .on("mouseleave", () => tooltip.style("display", "none"));
+
+  // Click: highlight + details
+  nodeSel.on("click", (e, d) => {
+    e.stopPropagation();
+    highlightNode(d);
+    showDetails(d);
+  });
+
+  // Double-click: tree view
+  nodeSel.on("dblclick", (e, d) => {
+    e.stopPropagation();
+    e.preventDefault();
+    showTreeView(d);
+  });
+
+  // Setup simulation
+  if (simulation) simulation.stop();
+  simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(edges).id(d => d.id).distance(120).strength(0.3))
+    .force("charge", d3.forceManyBody().strength(-300))
+    .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 12))
+    .force("x", d3.forceX(d => d.x).strength(0.8))
+    .force("y", d3.forceY(d => d.y).strength(0.8))
+    .alphaDecay(0.05)
+    .on("tick", () => {
+      linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      hitboxSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+              .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+  // After settling, relax x/y forces so user can drag freely
+  setTimeout(() => {
+    if (simulation) {
+      simulation.force("x", d3.forceX(d => d.x).strength(0.02));
+      simulation.force("y", d3.forceY(d => d.y).strength(0.02));
+    }
+  }, 3000);
+}
+
+function highlightNode(d) {
+  const connected = new Set([d.id]);
+  visibleEdges.forEach(l => {
+    const sid = l.source.id || l.source;
+    const tid = l.target.id || l.target;
+    if (sid === d.id) connected.add(tid);
+    if (tid === d.id) connected.add(sid);
+  });
+  nodeSel.style("opacity", n => connected.has(n.id) ? 1 : 0.12);
+  linkSel.style("opacity", l => {
+    const sid = l.source.id || l.source;
+    const tid = l.target.id || l.target;
+    return (sid === d.id || tid === d.id) ? 0.85 : 0.04;
+  });
+}
+
+function clearHighlight() {
+  if (nodeSel) nodeSel.style("opacity", 1);
+  if (linkSel) linkSel.style("opacity", 0.6);
+  d3.select("#details").classed("open", false);
+}
+
+svgEl.on("click", () => {
+  if (currentView === "overview") clearHighlight();
+});
+
+// --- Tree View ---
+function showTreeView(rootNode) {
+  currentView = "tree";
+  d3.select("#back-btn").style("display", "block");
+  d3.select("#controls").style("display", "none");
+  tooltip.style("display", "none");
+
+  // Collect all connected nodes (multi-hop)
+  const treeNodes = new Set([rootNode.id]);
+  const treeEdges = [];
+
+  // BFS outbound (what this node depends on)
+  let frontier = [rootNode.id];
+  const visitedOut = new Set([rootNode.id]);
+  while (frontier.length) {
+    const next = [];
+    frontier.forEach(id => {
+      allEdges.forEach(e => {
+        const sid = e.source.id || e.source;
+        const tid = e.target.id || e.target;
+        if (sid === id && !visitedOut.has(tid)) {
+          visitedOut.add(tid);
+          treeNodes.add(tid);
+          treeEdges.push(e);
+          next.push(tid);
+        }
+      });
+    });
+    frontier = next;
+  }
+
+  // BFS inbound (what depends on this node)
+  frontier = [rootNode.id];
+  const visitedIn = new Set([rootNode.id]);
+  while (frontier.length) {
+    const next = [];
+    frontier.forEach(id => {
+      allEdges.forEach(e => {
+        const sid = e.source.id || e.source;
+        const tid = e.target.id || e.target;
+        if (tid === id && !visitedIn.has(sid)) {
+          visitedIn.add(sid);
+          treeNodes.add(sid);
+          treeEdges.push(e);
+          next.push(sid);
+        }
+      });
+    });
+    frontier = next;
+  }
+
+  const tnodes = allNodes.filter(n => treeNodes.has(n.id)).map(d => ({...d}));
+  const tedges = treeEdges.map(d => ({...d}));
+  const nodeMap = {};
+  tnodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Build tree hierarchy: root at center, dependents below, dependencies above
+  const depthMap = {};
+  depthMap[rootNode.id] = 0;
+
+  // Upward: dependencies (things root depends on)
+  let upFrontier = [rootNode.id];
+  const upVisited = new Set([rootNode.id]);
+  while (upFrontier.length) {
+    const next = [];
+    upFrontier.forEach(id => {
+      tedges.forEach(e => {
+        const sid = e.source.id || e.source;
+        const tid = e.target.id || e.target;
+        if (sid === id && !upVisited.has(tid)) {
+          depthMap[tid] = (depthMap[id] || 0) - 1;
+          upVisited.add(tid);
+          next.push(tid);
+        }
+      });
+    });
+    upFrontier = next;
+  }
+
+  // Downward: dependents (things that depend on root)
+  let downFrontier = [rootNode.id];
+  const downVisited = new Set([rootNode.id]);
+  while (downFrontier.length) {
+    const next = [];
+    downFrontier.forEach(id => {
+      tedges.forEach(e => {
+        const sid = e.source.id || e.source;
+        const tid = e.target.id || e.target;
+        if (tid === id && !downVisited.has(sid)) {
+          depthMap[sid] = (depthMap[id] || 0) + 1;
+          downVisited.add(sid);
+          next.push(sid);
+        }
+      });
+    });
+    downFrontier = next;
+  }
+
+  // Assign any remaining
+  tnodes.forEach(n => { if (depthMap[n.id] === undefined) depthMap[n.id] = 0; });
+
+  // Normalize depths so min = 0
+  const minD = Math.min(...Object.values(depthMap));
+  Object.keys(depthMap).forEach(k => depthMap[k] -= minD);
+  const maxD = Math.max(...Object.values(depthMap), 1);
+
+  // Position nodes
+  const levels = {};
+  tnodes.forEach(n => {
+    const d = depthMap[n.id];
+    if (!levels[d]) levels[d] = [];
+    levels[d].push(n);
+  });
+
+  const levelH = Math.min(140, (height - 100) / (maxD + 2));
+  Object.entries(levels).forEach(([lvl, lnodes]) => {
+    const y = 60 + (+lvl) * levelH;
+    const xSpace = Math.max(100, (width - 200) / (lnodes.length + 1));
+    lnodes.forEach((n, i) => {
+      n.x = 100 + (i + 1) * xSpace;
+      n.y = y;
+      n.fx = n.x;
+      n.fy = n.y;
+    });
+  });
+
+  // Highlight root
+  const rootIdx = tnodes.findIndex(n => n.id === rootNode.id);
+  if (rootIdx >= 0) {
+    tnodes[rootIdx]._isRoot = true;
+  }
+
+  // Render tree
+  linkGroup.selectAll("*").remove();
+  nodeGroup.selectAll("*").remove();
+  if (simulation) simulation.stop();
+
+  linkSel = linkGroup.selectAll("line")
+    .data(tedges, d => `${d.source.id||d.source}-${d.target.id||d.target}-${d.type}`)
+    .join("line")
+    .attr("class", "link")
+    .attr("stroke", d => edgeStyles[d.type]?.color || "#555")
+    .attr("stroke-width", d => edgeStyles[d.type]?.width || 1.5)
+    .attr("stroke-dasharray", d => edgeStyles[d.type]?.dash || "")
+    .attr("stroke-opacity", 0.7)
+    .attr("marker-end", d => `url(#arrow-${d.type})`)
+    .attr("x1", d => nodeMap[d.source.id||d.source]?.x || 0)
+    .attr("y1", d => nodeMap[d.source.id||d.source]?.y || 0)
+    .attr("x2", d => nodeMap[d.target.id||d.target]?.x || 0)
+    .attr("y2", d => nodeMap[d.target.id||d.target]?.y || 0);
+
+  nodeSel = nodeGroup.selectAll("g")
+    .data(tnodes, d => d.id)
+    .join("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${d.x},${d.y})`);
+
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    const r = nodeRadius(d);
+    if (d.is_external) {
+      el.append("polygon")
+        .attr("class", "external")
+        .attr("points", `0,${-8} 8,0 0,8 ${-8},0`)
+        .attr("fill", langColors[d.primary_language] || langColors.unknown)
+        .attr("stroke", d._isRoot ? "#8be9fd" : "#fff")
+        .attr("stroke-width", d._isRoot ? 3 : 1)
+        .attr("stroke-opacity", d._isRoot ? 1 : 0.3);
+    } else {
+      el.append("circle").attr("r", r)
+        .attr("fill", langColors[d.primary_language] || langColors.unknown)
+        .attr("stroke", d._isRoot ? "#8be9fd" : "#fff")
+        .attr("stroke-width", d._isRoot ? 3 : 2)
+        .attr("stroke-opacity", d._isRoot ? 1 : 0.4);
+    }
+  });
+
+  // Vuln badges in tree
+  nodeSel.each(function(d) {
+    if (!d.vulnerability_counts?.total) return;
+    const el = d3.select(this);
+    const r = d.is_external ? 8 : nodeRadius(d);
+    let bc = "#4CAF50";
+    if (d.vulnerability_counts.medium > 0) bc = "#FF9800";
+    if (d.vulnerability_counts.high > 0) bc = "#f44336";
+    if (d.vulnerability_counts.critical > 0) bc = "#d32f2f";
+    el.append("circle").attr("cx", r-2).attr("cy", -r+2).attr("r", 9)
+      .attr("fill", bc).attr("stroke", "#1a1a2e").attr("stroke-width", 2);
+    el.append("text").attr("x", r-2).attr("y", -r+6)
+      .attr("text-anchor", "middle").attr("fill", "#fff")
+      .attr("font-size", "10px").attr("font-weight", "bold")
+      .attr("pointer-events", "none").text(d.vulnerability_counts.total);
+  });
+
+  nodeSel.append("text")
+    .attr("class", "node-label")
+    .attr("dy", d => (d.is_external ? 8 : nodeRadius(d)) + 16)
+    .style("fill", d => d._isRoot ? "#8be9fd" : "#ccc")
+    .style("font-weight", d => d._isRoot ? "700" : "500")
+    .text(d => displayName(d));
+
+  // Tooltip in tree view
+  nodeSel.on("mouseenter", (e, d) => {
+    let html = `<div class="tt-name">${displayName(d)}</div>`;
+    if (d.slug) html += `<div class="tt-row"><span class="tt-label">Repo</span><span class="tt-value">${d.slug}</span></div>`;
+    if (d.primary_language) html += `<div class="tt-row"><span class="tt-label">Language</span><span class="tt-value">${d.primary_language}</span></div>`;
+    if (d.loc_estimate) html += `<div class="tt-row"><span class="tt-label">LOC</span><span class="tt-value">${d.loc_estimate.toLocaleString()}</span></div>`;
+    if (d._isRoot) html += `<div class="tt-row"><span class="tt-label">Role</span><span class="tt-value" style="color:#8be9fd">Focus node</span></div>`;
+    tooltip.html(html).style("display", "block");
+  })
+  .on("mousemove", (e) => tooltip.style("left", (e.clientX+14)+"px").style("top", (e.clientY-10)+"px"))
+  .on("mouseleave", () => tooltip.style("display", "none"));
+
+  // Click in tree: show details
+  nodeSel.on("click", (e, d) => { e.stopPropagation(); showDetails(d); });
+
+  // Auto-fit
+  const bounds = g.node().getBBox();
+  if (bounds.width > 0) {
+    const scale = Math.min(0.85, Math.min((width-40)/bounds.width, (height-80)/bounds.height));
+    const tx = (width - bounds.width*scale)/2 - bounds.x*scale;
+    const ty = (height - bounds.height*scale)/2 - bounds.y*scale;
+    svgEl.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+  }
+}
+
+function exitTreeView() {
+  currentView = "overview";
+  d3.select("#back-btn").style("display", "none");
+  d3.select("#controls").style("display", "block");
+  clearHighlight();
+  svgEl.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+  render();
+}
+
+d3.select("#back-btn").on("click", exitTreeView);
+
+// --- Details panel ---
+function showDetails(d) {
+  const panel = d3.select("#details");
+  const outE = allEdges.filter(l => (l.source.id||l.source) === d.id);
+  const inE = allEdges.filter(l => (l.target.id||l.target) === d.id);
+
+  let html = `<h3>${displayName(d)}</h3>`;
+  if (d.slug) html += `<div style="font-size:12px;color:#666;margin-top:-8px;margin-bottom:12px">${d.slug}</div>`;
+  if (d.description) html += `<div class="detail-section"><div style="font-size:13px;color:#ccc;line-height:1.5;border-left:2px solid #333;padding-left:10px">${d.description}</div></div>`;
+  if (d.path) html += `<div class="detail-section"><h4>Path</h4><div style="font-size:12px;color:#aaa;word-break:break-all">${d.path}</div></div>`;
+  if (d.languages?.length) html += `<div class="detail-section"><h4>Languages</h4><div>${Array.isArray(d.languages) ? d.languages.join(", ") : d.languages}</div></div>`;
+  if (d.frameworks?.length) html += `<div class="detail-section"><h4>Frameworks</h4><div>${d.frameworks.join(", ")}</div></div>`;
+  if (d.loc_estimate) html += `<div class="detail-section"><h4>LOC</h4><div>${d.loc_estimate.toLocaleString()}</div></div>`;
+
+  if (d.vulnerability_counts?.total) {
+    const vc = d.vulnerability_counts;
+    html += `<div class="detail-section"><h4>Vulnerabilities</h4><div>`;
+    if (vc.critical) html += `<span style="color:#d32f2f;font-weight:bold">${vc.critical} Critical</span> `;
+    if (vc.high) html += `<span style="color:#f44336">${vc.high} High</span> `;
+    if (vc.medium) html += `<span style="color:#FF9800">${vc.medium} Medium</span> `;
+    if (vc.low) html += `<span style="color:#4CAF50">${vc.low} Low</span>`;
+    html += `</div></div>`;
+  }
+
+  if (outE.length) {
+    html += `<div class="detail-section"><h4>Depends on (${outE.length})</h4><ul class="dep-list">`;
+    outE.forEach(l => {
+      const tid = l.target.id || l.target;
+      const tn = allNodes.find(n => n.id === tid);
+      const s = edgeStyles[l.type] || {};
+      html += `<li data-node-id="${tid}"><span class="dep-badge" style="background:${s.color}30;color:${s.color}">${l.type}</span> ${displayName(tn || {id: tid})}</li>`;
+    });
+    html += `</ul></div>`;
+  }
+  if (inE.length) {
+    html += `<div class="detail-section"><h4>Depended on by (${inE.length})</h4><ul class="dep-list">`;
+    inE.forEach(l => {
+      const sid = l.source.id || l.source;
+      const sn = allNodes.find(n => n.id === sid);
+      const s = edgeStyles[l.type] || {};
+      html += `<li data-node-id="${sid}"><span class="dep-badge" style="background:${s.color}30;color:${s.color}">${l.type}</span> ${displayName(sn || {id: sid})}</li>`;
+    });
+    html += `</ul></div>`;
+  }
+
+  html += `<button class="tree-btn" onclick="document.getElementById('tree-trigger').dataset.nodeId='${d.id}'; document.getElementById('tree-trigger').click();">Show dependency tree for ${displayName(d)}</button>`;
+
+  d3.select("#details-content").html(html);
+  panel.classed("open", true);
+
+  // Wire up clickable dep list items → navigate to that node
+  d3.selectAll("#details-content .dep-list li[data-node-id]").on("click", function() {
+    const nid = this.dataset.nodeId;
+    const nd = allNodes.find(n => n.id === nid);
+    if (nd) { highlightNode(nd); showDetails(nd); }
+  });
+}
+
+// --- Edge Details Panel ---
+function showEdgeDetails(edgeData) {
+  const panel = d3.select("#details");
+  const s = edgeStyles[edgeData.type] || {};
+  const sid = edgeData.source.id || edgeData.source;
+  const tid = edgeData.target.id || edgeData.target;
+  const sn = allNodes.find(n => n.id === sid);
+  const tn = allNodes.find(n => n.id === tid);
+
+  let html = `<h3 style="color:${s.color}">${edgeData.type.charAt(0).toUpperCase() + edgeData.type.slice(1)} Dependency</h3>`;
+
+  // Connection with clickable node names
+  html += `<div class="edge-meta-section"><h4>Connection</h4>`;
+  html += `<div style="font-size:14px;line-height:1.8">`;
+  html += `<span class="edge-node-link" data-node-id="${sid}">${displayName(sn || {id: sid})}</span>`;
+  html += ` <span style="color:#666">&rarr;</span> `;
+  html += `<span class="edge-node-link" data-node-id="${tid}">${displayName(tn || {id: tid})}</span>`;
+  html += `</div></div>`;
+
+  // Stats
+  html += `<div class="edge-meta-section"><h4>Stats</h4>`;
+  html += `<div class="tt-row" style="display:flex;justify-content:space-between;margin:2px 0"><span style="color:#888">Weight</span><span>${edgeData.weight}</span></div>`;
+  html += `<div class="tt-row" style="display:flex;justify-content:space-between;margin:2px 0"><span style="color:#888">Confidence</span><span>${edgeData.confidence}</span></div>`;
+  if (edgeData.in_cycle) html += `<div class="tt-row" style="display:flex;justify-content:space-between;margin:2px 0"><span style="color:#ff5252">Circular</span><span style="color:#ff5252">Yes</span></div>`;
+  html += `</div>`;
+
+  // Details text
+  if (edgeData.details) {
+    html += `<div class="edge-meta-section"><h4>Details</h4>`;
+    html += `<div style="font-size:12px;color:#ccc;line-height:1.6;border-left:2px solid ${s.color}40;padding-left:10px">`;
+    html += edgeData.details.split(";").map(d => d.trim()).filter(Boolean).join("<br>");
+    html += `</div></div>`;
+  }
+
+  // Structured metadata (from analysis phase)
+  const meta = edgeData.metadata;
+  if (meta) {
+    if (meta.endpoints?.length) {
+      html += `<div class="edge-meta-section"><h4>API Endpoints</h4><ul class="edge-meta-list">`;
+      meta.endpoints.forEach(ep => { html += `<li style="color:#FF9800">${ep}</li>`; });
+      html += `</ul></div>`;
+    }
+    if (meta.packages?.length) {
+      html += `<div class="edge-meta-section"><h4>Packages</h4><ul class="edge-meta-list">`;
+      meta.packages.forEach(p => { html += `<li style="color:#4CAF50">${p}</li>`; });
+      html += `</ul></div>`;
+    }
+    if (meta.env_vars?.length) {
+      html += `<div class="edge-meta-section"><h4>Environment Variables</h4><ul class="edge-meta-list">`;
+      meta.env_vars.forEach(v => { html += `<li style="color:#FF9800">${v}</li>`; });
+      html += `</ul></div>`;
+    }
+    if (meta.services?.length) {
+      html += `<div class="edge-meta-section"><h4>Services</h4><ul class="edge-meta-list">`;
+      meta.services.forEach(sv => { html += `<li style="color:#2196F3">${sv}</li>`; });
+      html += `</ul></div>`;
+    }
+    if (meta.files?.length) {
+      html += `<div class="edge-meta-section"><h4>Source References</h4><ul class="edge-meta-list">`;
+      meta.files.forEach(f => { html += `<li>${f}</li>`; });
+      html += `</ul></div>`;
+    }
+    if (meta.manifest) {
+      html += `<div class="edge-meta-section"><h4>Manifest</h4><div style="font-size:12px;color:#aaa">${meta.manifest}</div></div>`;
+    }
+    if (meta.ref_type) {
+      html += `<div class="edge-meta-section"><h4>Reference Type</h4><div style="font-size:12px;color:#aaa">${meta.ref_type}</div></div>`;
+    }
+  }
+
+  d3.select("#details-content").html(html);
+  panel.classed("open", true);
+
+  // Wire up clickable node names in edge details
+  d3.selectAll("#details-content .edge-node-link[data-node-id]").on("click", function() {
+    const nid = this.dataset.nodeId;
+    const nd = allNodes.find(n => n.id === nid);
+    if (nd) { highlightNode(nd); showDetails(nd); }
+  });
+
+  // Highlight the connected nodes
+  const connected = new Set([sid, tid]);
+  if (nodeSel) nodeSel.style("opacity", n => connected.has(n.id) ? 1 : 0.12);
+  if (linkSel) linkSel.style("opacity", l => {
+    const ls = l.source.id || l.source;
+    const lt = l.target.id || l.target;
+    return (ls === sid && lt === tid && l.type === edgeData.type) ? 1 : 0.04;
+  });
+}
+
+d3.select("#close-details").on("click", () => {
+  d3.select("#details").classed("open", false);
+  if (currentView === "overview") clearHighlight();
+});
+
+// Hidden element for tree trigger from details panel
+const treeTrigger = document.createElement("button");
+treeTrigger.id = "tree-trigger";
+treeTrigger.style.display = "none";
+document.body.appendChild(treeTrigger);
+treeTrigger.addEventListener("click", () => {
+  const nid = treeTrigger.dataset.nodeId;
+  const nd = allNodes.find(n => n.id === nid);
+  if (nd) {
+    d3.select("#details").classed("open", false);
+    showTreeView(nd);
+  }
+});
+
+// Drag
+function dragStart(e, d) { if (simulation && !e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+function dragging(e, d) { d.fx = e.x; d.fy = e.y; }
+function dragEnd(e, d) { if (simulation && !e.active) simulation.alphaTarget(0); }
+
+// Filters
+d3.selectAll(".edge-filter").on("change", () => { if (currentView === "overview") render(); });
+d3.select("#show-externals").on("change", () => { if (currentView === "overview") render(); });
+d3.select("#search").on("input", () => {
+  const q = d3.select("#search").property("value").toLowerCase().trim();
+  if (nodeSel) {
+    nodeSel.style("opacity", d => {
+      if (!q) return 1;
+      return (d.label || d.id).toLowerCase().includes(q) ? 1 : 0.12;
+    });
+  }
+});
+d3.select("#reset-btn").on("click", () => {
+  d3.selectAll(".edge-filter").property("checked", true);
+  d3.select("#show-externals").property("checked", false);
+  d3.select("#search").property("value", "");
+  d3.select("#details").classed("open", false);
+  svgEl.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+  render();
+});
+
+// Language legend
+const usedLangs = [...new Set(allNodes.filter(n => !n.is_external).map(n => n.primary_language).filter(Boolean))];
+const langLegend = d3.select("#lang-legend");
+usedLangs.forEach(lang => {
+  langLegend.append("div").attr("class", "legend-item")
+    .html(`<span class="legend-swatch" style="background:${langColors[lang] || langColors.unknown}"></span>${lang}`);
+});
+
+// Footer
+const meta = graphData.metadata || {};
+const ec = meta.edge_counts || {};
+d3.select("#footer").html(
+  `<span>Scanned: ${meta.scan_date || "unknown"}</span>` +
+  `<span>Repos: ${meta.total_repos || allNodes.filter(n => !n.is_external).length}</span>` +
+  `<span>Edges: ${meta.total_edges || allEdges.length}</span>` +
+  `<span>Pkg: ${ec.package||0} | API: ${ec.api||0} | Shared: ${ec.shared||0} | Infra: ${ec.infra||0}</span>`
+);
+if (meta.cycle_count > 0) d3.select("#footer").append("span").style("color","#ff5252").text(`Cycles: ${meta.cycle_count}`);
+
+// Export SVG
+d3.select("#export-svg").on("click", () => {
+  const el = document.getElementById("graph");
+  const clone = el.cloneNode(true);
+  const gt = g.attr("transform");
+  if (gt) clone.querySelector("g").setAttribute("transform", gt);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const s = document.createElement("style");
+  s.textContent = document.querySelector("style").textContent;
+  clone.insertBefore(s, clone.firstChild);
+  const blob = new Blob([new XMLSerializer().serializeToString(clone)], {type: "image/svg+xml"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "dep-graph.svg"; a.click();
+});
+
+// Export PNG
+d3.select("#export-png").on("click", () => {
+  const el = document.getElementById("graph");
+  const clone = el.cloneNode(true);
+  const gt = g.attr("transform");
+  if (gt) clone.querySelector("g").setAttribute("transform", gt);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const s = document.createElement("style");
+  s.textContent = document.querySelector("style").textContent;
+  clone.insertBefore(s, clone.firstChild);
+  const data = new XMLSerializer().serializeToString(clone);
+  const canvas = document.createElement("canvas");
+  canvas.width = width*2; canvas.height = height*2;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const img = new Image();
+  img.onload = () => { ctx.drawImage(img,0,0,canvas.width,canvas.height); canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "dep-graph.png"; a.click(); }); };
+  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(data)));
+});
+
+document.title = `Dependency Graph — ${meta.parent_directory || ""}`;
+
+// Initial render
+render();
+</script>
+</body>
+</html>
