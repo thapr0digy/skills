@@ -51,6 +51,7 @@ The file must conform exactly to the schema below. Every field is required. Use 
   "dependency_manifests": ["requirements.txt", "package.json"],
   "available_tools": {
     "semgrep": true,
+    "opengrep": false,
     "trufflehog": true,
     "gitleaks": false,
     "pip-audit": true,
@@ -312,7 +313,7 @@ Exclude `node_modules/` and `vendor/`. Return paths relative to repo root.
 Run the following single command to check all tools at once:
 
 ```bash
-for tool in semgrep trufflehog gitleaks pip-audit govulncheck cargo-audit bundle-audit composer npm; do
+for tool in semgrep opengrep trufflehog gitleaks pip-audit govulncheck cargo-audit bundle-audit composer npm; do
   command -v "$tool" >/dev/null 2>&1 && echo "$tool:true" || echo "$tool:false"
 done
 ```
@@ -322,6 +323,7 @@ Map results to the `available_tools` object. Use the following key names exactly
 | Binary checked | JSON key |
 |---|---|
 | `semgrep` | `semgrep` |
+| `opengrep` | `opengrep` |
 | `trufflehog` | `trufflehog` |
 | `gitleaks` | `gitleaks` |
 | `pip-audit` | `pip-audit` |
