@@ -242,10 +242,19 @@ Do not abort if one or more of these phases fail — proceed to validation with 
    | Placeholder                    | File path                                              |
    |-------------------------------|--------------------------------------------------------|
    | `{{STATIC_ANALYSIS_FINDINGS}}` | `{OUTPUT_DIR}/findings/static-analysis.json` |
-   | `{{CODE_REVIEW_FINDINGS}}`     | `{OUTPUT_DIR}/findings/code-review.json`     |
    | `{{DEPENDENCY_FINDINGS}}`      | `{OUTPUT_DIR}/findings/dependencies.json`    |
 
-4. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 6 validation"`.
+   For `{{CODE_REVIEW_FINDINGS}}`: glob all group output files and merge their findings arrays:
+
+   ```bash
+   ls {OUTPUT_DIR}/findings/code-review-*.json 2>/dev/null
+   ```
+
+   For each matched file (e.g., `code-review-1.json`, `code-review-2.json`), read the file and extract the `findings` array from the JSON object. Concatenate all `findings` arrays into a single JSON array. Inject this merged array as `{{CODE_REVIEW_FINDINGS}}`.
+
+   If no `code-review-*.json` files exist, inject an empty array `[]` for `{{CODE_REVIEW_FINDINGS}}`.
+
+4. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 7 validation"`.
 5. Wait for the subagent to return.
 6. Use the Read tool to load `{OUTPUT_DIR}/validated-findings.json`.
    - **If the file exists and is valid JSON:** store its contents as `VALIDATED_FINDINGS`. Append a `completed` log entry.
