@@ -242,7 +242,7 @@ The full JSON schema definition (for validation):
     "schema_version": { "const": "1.0.0" },
     "id": {
       "type": "string",
-      "pattern": "^(STATIC|REVIEW|DEP|SECRET|VULN)-\\d{3,}$"
+      "pattern": "^(STATIC|REVIEW(-\\d+)?|DEP|SECRET|VULN)-\\d{3,}$"
     },
     "phase": {
       "enum": ["static-analysis", "code-review", "dependencies", "secrets", "validation"]

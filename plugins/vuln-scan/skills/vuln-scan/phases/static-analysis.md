@@ -243,7 +243,7 @@ Each element in the output array must conform to this schema:
     "schema_version": { "const": "1.0.0" },
     "id": {
       "type": "string",
-      "pattern": "^(STATIC|REVIEW|DEP|SECRET|VULN)-\\d{3,}$"
+      "pattern": "^(STATIC|REVIEW(-\\d+)?|DEP|SECRET|VULN)-\\d{3,}$"
     },
     "phase": {
       "enum": ["static-analysis", "code-review", "dependencies", "secrets", "validation"]
