@@ -20,6 +20,7 @@ This object contains:
   - `id`: path ID (e.g., `PATH-001`)
   - `entry_point_id`: matching entry point ID or null
   - `description`: why this path is high-risk
+  - `priority`: priority ranking for this path (lower = higher priority)
   - `files`: array of file paths to read and review (relative to target path)
   - `shared_files_needed`: array of shared file paths needed for context
 
@@ -52,6 +53,14 @@ This is a JSON object mapping file path → file content string.
 ```
 
 If the services array is non-empty, each finding must include a `service` field. Match finding file path against service paths using longest-prefix matching.
+
+### Output Directory
+
+```
+{{OUTPUT_DIR}}
+```
+
+Absolute path to the scan output directory for this run.
 
 ---
 
@@ -199,7 +208,8 @@ Every finding must conform to this schema. Required fields are marked with `*`.
   "references": [                     // optional — CWE, OWASP, or authoritative links
     "https://cwe.mitre.org/data/definitions/89.html"
   ],
-  "source_tool": "llm"                // * always "llm"
+  "source_tool": "llm",               // * always "llm"
+  "service": "api"                    // * required if services array is non-empty; omit otherwise
 }
 ```
 
@@ -313,6 +323,7 @@ The full JSON schema definition (for validation):
       "items": { "type": "string" }
     },
     "source_tool": { "type": "string" },
+    "service": { "type": "string" },
     "correlated_ids": {
       "type": "array",
       "items": { "type": "string" }

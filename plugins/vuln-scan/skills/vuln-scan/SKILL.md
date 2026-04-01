@@ -254,7 +254,7 @@ Do not abort if one or more of these phases fail — proceed to validation with 
 
    If no `code-review-*.json` files exist, inject an empty array `[]` for `{{CODE_REVIEW_FINDINGS}}`.
 
-4. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 7 validation"`.
+4. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 6 validation"`.
 5. Wait for the subagent to return.
 6. Use the Read tool to load `{OUTPUT_DIR}/validated-findings.json`.
    - **If the file exists and is valid JSON:** store its contents as `VALIDATED_FINDINGS`. Append a `completed` log entry.
