@@ -89,6 +89,12 @@ For each path in your working list (in priority order):
    - **SSRF** — user-controlled URLs or hostnames used in server-side HTTP requests without allowlisting
    - **Open redirects** — user-controlled redirect targets without validation
    - **Business logic flaws** — sequences of operations that can be manipulated (e.g., skipping required steps, replaying idempotent actions, exploiting numeric edge cases)
+   - **Insecure file/directory permissions** — for every `os.OpenFile`, `os.Create`, `os.MkdirAll`, `os.Mkdir`, `WriteFile`, or equivalent call, check the permission mode argument. Flag `0644` or broader on files containing sensitive data (credentials, keys, restored backups). Flag `0755` or broader on directories that hold sensitive files. The correct default for sensitive files is `0600` (owner read/write only); for sensitive directories, `0700`.
+   - **Unbounded memory growth** — any map, slice, or channel that is populated by external input (network messages, goroutines) but never cleaned up. Look for missing size caps and missing timeout/eviction logic on collections that live for the duration of a request or longer.
+   - **`io.ReadAll` / `ioutil.ReadAll` without size limit** — reading a network response or file entirely into memory with no `io.LimitReader` cap. Flag every occurrence in network-facing code (HTTP clients, gRPC stream handlers). Estimate risk based on what controls the response size.
+   - **Unsynchronized map access** — in Go, every map read and write must be protected by the same mutex or use `sync.Map`. Check files that hold maps as struct fields: verify that ALL methods on the struct that access the map do so under the same lock. Do not assume a mutex protects a map just because other methods use it — check each access site individually.
+   - **Non-cryptographic hash for integrity-critical operations** — `xxhash`, `fnv`, `crc32`, `adler32`, and similar are appropriate for checksumming/deduplication but NOT for integrity verification when an adversary controls the data. Flag any use of non-cryptographic hashes to verify binaries, signatures, or data where an attacker could craft a collision. The context matters: xxhash for prefix deduplication in backup is low risk; xxhash for verifying a downloaded binary before execution is high risk.
+   - **Filename sanitization after `filepath.Base()`** — `filepath.Base()` strips directory components but does not remove Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`), null bytes, or control characters. Any code path where an attacker-controlled string is passed through `filepath.Base()` and then used as a filename on Windows must reject reserved names explicitly.
 
 5. When a source-to-sink path is traceable, record a `data_flow` array (see schema below).
 6. Record all findings for this path before moving to the next.
@@ -119,7 +125,7 @@ Then apply `sharp-edges` analysis (or equivalent built-in logic) to all security
 
 ### Step 5: Output
 
-Write your findings to `.vuln-scan/findings/code-review.json` using the schema defined below.
+Write your findings to `{{OUTPUT_DIR}}/findings/code-review.json` using the schema defined below.
 
 ---
 
@@ -182,7 +188,7 @@ Every finding must conform to this schema. Required fields are marked with `*`.
     "line_end": 52,                   // * integer
     "snippet": "..."                  // optional but strongly recommended
   },
-  "description": "...",               // * explain the vulnerability clearly
+  "description": "...",               // * two-part format: explanation + impact (see below)
   "evidence": "...",                  // optional — specific evidence from the code
   "data_flow": [                      // optional — include when source-to-sink is traceable
     {
@@ -204,6 +210,22 @@ Every finding must conform to this schema. Required fields are marked with `*`.
   ],
   "source_tool": "llm"                // * always "llm"
 }
+```
+
+### Description construction
+
+The `description` field must contain two parts:
+
+1. **Vulnerability explanation** — What the vulnerability is. Describe the specific flaw you found in the code: what is wrong, where the unsafe pattern occurs, and what security property it violates. Be precise — reference the actual code pattern, not generic CWE boilerplate.
+
+2. **Impact statement** — What an attacker can accomplish and how. Start with "An attacker" or "A remote attacker" and describe the concrete attack scenario: what the attacker controls (the source), what action they can take (the exploit), and what the consequence is for the application (data theft, privilege escalation, denial of service, etc.).
+
+Format as a single string with the two parts separated by a space. Do not use bullet points or newlines.
+
+**Example:**
+
+```
+"The updateUser endpoint accepts a user ID from the URL path and updates the corresponding record without verifying that the authenticated user owns that record, allowing horizontal privilege escalation. An attacker can modify any user's profile (email, password, role) by changing the ID parameter in the request, potentially taking over other accounts or escalating to admin privileges."
 ```
 
 The full JSON schema definition (for validation):
@@ -312,7 +334,7 @@ The full JSON schema definition (for validation):
 
 ## Output File Format
 
-Write a single JSON object to `.vuln-scan/findings/code-review.json`:
+Write a single JSON object to `{{OUTPUT_DIR}}/findings/code-review.json`:
 
 ```json
 {
@@ -338,4 +360,12 @@ Write a single JSON object to `.vuln-scan/findings/code-review.json`:
 
 If no vulnerabilities are found, write an empty `findings` array. An empty findings list is a valid and expected result.
 
-Do not write any other files. Do not modify any source files in the target repository.
+## Write Boundary
+
+You may only create or modify files inside `{{OUTPUT_DIR}}/`. Do not write, edit, or append to any file outside this directory. Do not modify any source files in the target repository.
+
+**Before completing this phase**, review every Write, Edit, and Bash tool call you made. If any created or modified a file outside `{{OUTPUT_DIR}}/`, revert it immediately using `git checkout -- <file>` (for tracked files) or `rm <file>` (for untracked files you created), then append a violation entry to `{{OUTPUT_DIR}}/scan.log`:
+
+```json
+{"ts": "<ISO 8601>", "phase": "code-review", "event": "write_violation", "file": "<absolute path>", "action": "reverted"}
+```

@@ -16,7 +16,7 @@ Do NOT use the Agent tool. Do NOT prompt the user. Never crash — if any detect
 
 ## Output
 
-Write a single JSON file to: `{{TARGET_PATH}}/.vuln-scan/repo-profile.json`
+Write a single JSON file to: `{{OUTPUT_DIR}}/repo-profile.json`
 
 The file must conform exactly to the schema below. Every field is required. Use empty arrays (`[]`) for any field where detection yields no results — never omit a field.
 
@@ -108,7 +108,7 @@ Execute these steps in order using Glob, Grep, and Bash tools.
 ### Step 1 — Ensure output directory exists
 
 ```bash
-mkdir -p {{TARGET_PATH}}/.vuln-scan
+mkdir -p {{OUTPUT_DIR}}
 ```
 
 ### Step 2 — Detect Git
@@ -121,7 +121,7 @@ Check whether `{{TARGET_PATH}}/.git` exists. Set `is_git` to `true` or `false` a
 
 ### Step 2.5 — Load monorepo configuration (if present)
 
-Check whether `{{TARGET_PATH}}/.vuln-scan/config.json` exists. If it does, read it and extract the `services` array. This file allows users to explicitly define service boundaries when auto-detection is insufficient.
+Check whether `{{OUTPUT_DIR}}/config.json` exists. If it does, read it and extract the `services` array. This file allows users to explicitly define service boundaries when auto-detection is insufficient.
 
 Expected config format:
 
@@ -397,7 +397,19 @@ Combine all results into the schema above. Double-check:
 - `services` is an array (empty `[]` for non-monorepo)
 - Each service has `name`, `path`, and `type`
 
-Write the final JSON to `{{TARGET_PATH}}/.vuln-scan/repo-profile.json`.
+Write the final JSON to `{{OUTPUT_DIR}}/repo-profile.json`.
+
+---
+
+## Write Boundary
+
+You may only create or modify files inside `{{OUTPUT_DIR}}/`. Do not write, edit, or append to any file outside this directory. Do not modify any source files in the target repository.
+
+**Before completing this phase**, review every Write, Edit, and Bash tool call you made. If any created or modified a file outside `{{OUTPUT_DIR}}/`, revert it immediately using `git checkout -- <file>` (for tracked files) or `rm <file>` (for untracked files you created), then append a violation entry to `{{OUTPUT_DIR}}/scan.log`:
+
+```json
+{"ts": "<ISO 8601>", "phase": "recon", "event": "write_violation", "file": "<absolute path>", "action": "reverted"}
+```
 
 ---
 
@@ -414,4 +426,4 @@ Write the final JSON to `{{TARGET_PATH}}/.vuln-scan/repo-profile.json`.
 
 ## Success Condition
 
-Phase 1 is complete when `{{TARGET_PATH}}/.vuln-scan/repo-profile.json` exists and is valid JSON containing all required fields. Return a one-line summary of what was found: languages, frameworks, LOC estimate, and tool availability.
+Phase 1 is complete when `{{OUTPUT_DIR}}/repo-profile.json` exists and is valid JSON containing all required fields. Return a one-line summary of what was found: languages, frameworks, LOC estimate, and tool availability.

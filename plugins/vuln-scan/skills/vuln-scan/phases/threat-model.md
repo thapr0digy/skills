@@ -33,7 +33,39 @@ Before performing your own analysis, attempt to invoke the `openai-security-thre
 
 ---
 
-## Step 2: Selective Code Reads
+## Step 2: Enumerate External Attack Surface via Code Patterns
+
+Before reading any files from the repo profile, run the following grep searches against the target repository. These searches surface files that make external network requests or execute external binaries — two categories that the recon phase often misses but that represent high-impact attack surface.
+
+Run from `{TARGET_PATH}`:
+
+```bash
+# Files making outbound HTTP/network requests
+grep -rl "http\.Client\|http\.Get\|http\.Post\|url\.Parse\|net\.Dial\|grpc\.Dial\|net\.Listen" \
+  --include="*.go" --include="*.py" --include="*.js" --include="*.ts" \
+  . 2>/dev/null | grep -v "_test\." | grep -v "vendor/"
+
+# Files executing external binaries or subprocesses
+grep -rl "exec\.Command\|os\.StartProcess\|subprocess\.\|os\.system\|child_process" \
+  --include="*.go" --include="*.py" --include="*.js" --include="*.ts" \
+  . 2>/dev/null | grep -v "_test\." | grep -v "vendor/"
+
+# Files using non-cryptographic hashes (xxhash, fnv, adler, crc) in non-test code
+grep -rl "xxhash\|fnv\.\|adler\|crc32\|crc64\|murmur" \
+  --include="*.go" --include="*.py" --include="*.js" --include="*.ts" \
+  . 2>/dev/null | grep -v "_test\." | grep -v "vendor/"
+
+# Files writing files to disk with explicit permission modes
+grep -rl "OpenFile\|MkdirAll\|Mkdir\|WriteFile\|chmod\|os\.Create" \
+  --include="*.go" \
+  . 2>/dev/null | grep -v "_test\." | grep -v "vendor/"
+```
+
+Add any files found by these searches to the `high_risk_paths` list in Step 5, with priority 5 or higher, if they are not already covered by the repo profile's `security_surface` or `entry_points` fields. For files found by the network-request search, this is the `API → External services` boundary. For binary execution files, this is a new boundary: `Agent → External Binary Execution`.
+
+---
+
+## Step 2b: Selective Code Reads
 
 Read a targeted set of files to understand security posture. Do not deep-read implementation details — focus on structure and surface.
 
@@ -262,17 +294,29 @@ The valid enum values for `risk` and `sensitivity` are:
 Write the completed JSON object to:
 
 ```
-.vuln-scan/threat-model.json
+{{OUTPUT_DIR}}/threat-model.json
 ```
 
-Create the `.vuln-scan/` directory if it does not exist. Do not write any other files. Do not modify any source files in the target repository.
+Create the `{{OUTPUT_DIR}}/` directory if it does not exist.
+
+---
+
+## Write Boundary
+
+You may only create or modify files inside `{{OUTPUT_DIR}}/`. Do not write, edit, or append to any file outside this directory. Do not modify any source files in the target repository.
+
+**Before completing this phase**, review every Write, Edit, and Bash tool call you made. If any created or modified a file outside `{{OUTPUT_DIR}}/`, revert it immediately using `git checkout -- <file>` (for tracked files) or `rm <file>` (for untracked files you created), then append a violation entry to `{{OUTPUT_DIR}}/scan.log`:
+
+```json
+{"ts": "<ISO 8601>", "phase": "threat-model", "event": "write_violation", "file": "<absolute path>", "action": "reverted"}
+```
 
 ---
 
 ## Constraints
 
 - **No user interaction.** Make all decisions autonomously.
-- **No source modifications.** Only write to `.vuln-scan/`.
+- **No source modifications.** Only write to `{{OUTPUT_DIR}}/`.
 - **No deep implementation reads.** Structural understanding only — save token budget for downstream phases.
 - **Selective reads only.** Read the files listed in Step 2. Do not recursively read entire directories.
 - **All assumptions must be explicit and testable.** Vague assumptions are not useful.

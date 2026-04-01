@@ -39,7 +39,7 @@ If the services array is empty (not a monorepo), omit the `service` field entire
 
 ## Output
 
-Write a single JSON file to: `{repo.path}/.vuln-scan/findings/dependencies.json`
+Write a single JSON file to: `{{OUTPUT_DIR}}/findings/dependencies.json`
 
 The file must be a JSON array of finding objects. An empty scan (no vulnerabilities found, all tools skipped, or all tools failed) must still produce a valid file:
 
@@ -73,7 +73,7 @@ All findings use this exact format. Every required field must be present.
     "fixed_version": "2.31.0",
     "cvss": 6.1
   },
-  "description": "requests 2.28.0 is vulnerable to CVE-2023-32681: Unintended leak of Proxy-Authorization header on redirect.",
+  "description": "requests 2.28.0 (CVE-2023-32681) leaks the Proxy-Authorization header when following cross-origin redirects due to insufficient header stripping during redirect handling. An attacker who controls a redirect target can capture proxy credentials from outbound requests, potentially gaining unauthorized access to internal network resources behind the proxy.",
   "evidence": "CVSS 6.1 (Medium). No known public exploit. Advisory: https://github.com/advisories/GHSA-j8r2-6x86-q33q",
   "remediation": "Upgrade requests to 2.31.0 or later.",
   "references": [
@@ -87,6 +87,24 @@ All findings use this exact format. Every required field must be present.
 **Required fields:** `schema_version`, `id`, `phase`, `title`, `severity`, `confidence`, `category`, `location`, `description`, `remediation`, `source_tool`
 
 **Optional fields:** `cwe`, `evidence`, `references`
+
+### Description construction
+
+The `description` field must contain two parts:
+
+1. **Vulnerability explanation** — What the vulnerability is. State the affected package, version, CVE/advisory ID, and the technical flaw (e.g., "insufficient input validation in URL redirect handling"). Extract this from the advisory's description text provided by the audit tool. If the tool output includes a description field, use it as the basis — do not invent details.
+
+2. **Impact statement** — What an attacker can accomplish and how. Start with "An attacker" or "A remote attacker" and describe the concrete attack scenario: what the attacker controls, what action they can take, and what the consequence is for the application.
+
+Format as a single string with the two parts separated by a space. Do not use bullet points or newlines.
+
+**Example:**
+
+```
+"requests 2.28.0 (CVE-2023-32681) leaks the Proxy-Authorization header when following cross-origin redirects due to insufficient header stripping during redirect handling. An attacker who controls a redirect target can capture proxy credentials from outbound requests, potentially gaining unauthorized access to internal network resources behind the proxy."
+```
+
+If the audit tool does not provide enough detail to write a meaningful impact statement (e.g., the description is just a CVE ID with no text), write what you can from the advisory metadata and append: `"Consult the advisory for full impact details."`
 
 ### Location variant for dependencies
 
@@ -157,6 +175,7 @@ Map CVSS v3 base scores to severity:
 
 | Signal | Confidence |
 |---|---|
+| govulncheck call-graph analysis confirms reachability | `confirmed` |
 | Known CVE with a confirmed public exploit | `confirmed` |
 | Known CVE, no public exploit | `likely` |
 | Advisory without a CVE (e.g., GHSA only) | `possible` |
@@ -168,7 +187,7 @@ Map CVSS v3 base scores to severity:
 ### Step 1 — Ensure output directory exists
 
 ```bash
-mkdir -p "{repo.path}/.vuln-scan/findings"
+mkdir -p "{{OUTPUT_DIR}}/findings"
 ```
 
 Replace `{repo.path}` with the actual value from `repo.path` in the profile.
@@ -226,15 +245,49 @@ Where `{manifest_dir}` is the directory portion of the `package.json` path. If t
 
 ---
 
-**Go — govulncheck**
+**Go — govulncheck + osv.dev direct query**
 
 Availability key: `govulncheck`
+
+**Step A — govulncheck call-graph analysis (when available)**
 
 Run from the directory containing `go.mod`:
 
 ```bash
 cd "{manifest_dir}" && govulncheck -json ./... 2>/dev/null
 ```
+
+**IMPORTANT:** Always use `./...` to scan the entire module at once. Do NOT use `govulncheck --query <module>@<version>` or scan individual packages/modules separately. The `./...` pattern performs call-graph analysis across the whole module, which is required for accurate reachability classification. The `--query` flag only checks if a vulnerability exists in a module version without analyzing whether the vulnerable code is actually reachable — it cannot produce `confirmed` confidence findings.
+
+**Step B — osv.dev direct query (ALWAYS run, regardless of govulncheck result)**
+
+This step is mandatory even when govulncheck succeeds. govulncheck requires fetching all transitive dependencies, which fails for modules with private Git dependencies. The osv.dev API requires no module download and catches CVEs that govulncheck misses when private modules are present.
+
+1. Read `{manifest_dir}/go.mod`. For each `require` line, extract the module path and version.
+2. For each dependency, query the osv.dev batch API:
+
+```bash
+curl -s -X POST "https://api.osv.dev/v1/querybatch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queries": [
+      {"package": {"name": "MODULE_PATH", "ecosystem": "Go"}, "version": "VERSION"},
+      ...
+    ]
+  }'
+```
+
+Build the queries array from all `require` entries in `go.mod` (both direct and indirect). Strip the leading `v` from version strings (e.g., `v1.79.2` → `1.79.2`).
+
+3. For each response entry with a non-empty `vulns` array, create a finding. Set:
+   - `confidence` ← `"likely"` (osv.dev confirms the version is in the affected range, but cannot prove the vulnerable symbol is reachable)
+   - Override to `"confirmed"` if govulncheck Step A also reported the same vulnerability with a reachability trace
+   - `source_tool` ← `"osv.dev"`
+   - `cvss` ← from the OSV `severity[].score` field if present (parse the CVSS string to extract the base score number)
+
+4. Deduplicate: if govulncheck and osv.dev both found the same vulnerability (same CVE/GHSA ID in the same package), emit only one finding and set `confidence` to `"confirmed"`.
+
+If `curl` is not available, attempt the osv.dev query using the WebFetch tool instead.
 
 ---
 
@@ -356,13 +409,45 @@ For each tool's JSON output, parse vulnerabilities into finding objects. Rules f
 - `fixed_version` ← `fixAvailable.version` if it's an object, `null` if `fixAvailable` is `false`
 - Extract CVE IDs from nested `via` entries where available
 
-**govulncheck output (JSON lines):**
-Each line is a JSON object with `"osv"` or `"finding"` type. Focus on `"finding"` entries:
+**govulncheck output (JSON stream):**
+
+govulncheck emits a JSON stream. The relevant message types are `osv` (vulnerability metadata) and `finding` (affected symbol with trace):
+
 ```json
-{"finding": {"osv": "GO-2023-1234", "fixed_version": "v1.2.3", "trace": [...]}}
+{"osv": {"id": "GO-2023-1234", "aliases": ["CVE-2023-..."], "affected": [{"package": {"name": "..."}, "ranges": [{"events": [{"fixed": "v1.2.3"}]}]}]}}
+{"finding": {"osv": "GO-2023-1234", "trace": [{"module": "golang.org/x/net", "package": "golang.org/x/net/http2", "function": "Server.ServeConn", "version": "v0.7.0"}, {"module": "myapp", "package": "myapp/server", "function": "main"}]}}
 ```
-- Parse GO advisory IDs; map CVSS from the OSV database entry if included
-- `package` ← derive from the `trace[0].module` or `trace[0].package` fields
+
+#### Reachability classification
+
+govulncheck traces tell you whether the vulnerable function is actually called by the application. Classify each finding by trace depth:
+
+| Trace structure | Reachability | Meaning |
+|---|---|---|
+| Trace has 2+ frames AND the last frame's `module` is the scanned module (user code) | **called** | Vulnerable function is reachable via the application's call graph |
+| Trace has only 1 frame (module-level only) or last frame is not in user code | **uncalled** | Module is imported but the vulnerable symbol is never invoked |
+
+**How to determine "user code":** The last frame in the trace whose `module` matches the module path in the scanned `go.mod` (i.e., it is not a third-party module) indicates the call originates from user code. If no frame belongs to user code, the finding is **uncalled**.
+
+#### Mapping reachability to findings
+
+**Called (reachable) findings:**
+- Emit as a normal finding
+- `confidence` ← `confirmed` (govulncheck proved the call graph reaches the vulnerable function)
+- `evidence` ← include the call trace: `"Reachable: {user_function} → ... → {vulnerable_function} (govulncheck call-graph analysis)"`
+- Severity ← use standard CVSS mapping
+
+**Uncalled (unreachable) findings:**
+- **Do not emit a finding.** Unreachable Go vulnerabilities are informational noise. Skip them silently.
+
+#### Field mapping
+
+- `package` ← `trace[0].package` (the vulnerable package), falling back to `trace[0].module`
+- `installed_version` ← `trace[0].version` (strip the `v` prefix if present for consistency, e.g., `v0.7.0` → `0.7.0`)
+- `fixed_version` ← extract from the matching `osv` entry's `affected[].ranges[].events[].fixed`, or `null`
+- `title` ← `"{osv_id} in {package} {version} (reachable)"`
+- CVE ID ← extract from `osv.aliases[]` if an entry starts with `CVE-`
+- `cwe` ← map from CVE if available, otherwise omit
 
 **cargo audit output:**
 ```json
@@ -437,7 +522,19 @@ Look for `dependencies[].vulnerabilities[]` in the JSON report:
 1. Collect all parsed findings from all tools into a single list.
 2. Sort by severity (critical → low) then by package name alphabetically.
 3. Assign IDs `DEP-001`, `DEP-002`, ... in order.
-4. Write the array to `.vuln-scan/findings/dependencies.json`.
+4. Write the array to `{{OUTPUT_DIR}}/findings/dependencies.json`.
+
+---
+
+## Write Boundary
+
+You may only create or modify files inside `{{OUTPUT_DIR}}/`. Do not write, edit, or append to any file outside this directory. Do not modify any source files in the target repository.
+
+**Before completing this phase**, review every Write, Edit, and Bash tool call you made. If any created or modified a file outside `{{OUTPUT_DIR}}/`, revert it immediately using `git checkout -- <file>` (for tracked files) or `rm <file>` (for untracked files you created), then append a violation entry to `{{OUTPUT_DIR}}/scan.log`:
+
+```json
+{"ts": "<ISO 8601>", "phase": "dependency-scan", "event": "write_violation", "file": "<absolute path>", "action": "reverted"}
+```
 
 ---
 
@@ -455,4 +552,4 @@ Look for `dependencies[].vulnerabilities[]` in the JSON report:
 
 ## Success Condition
 
-Phase 5 is complete when `.vuln-scan/findings/dependencies.json` exists and is valid JSON (either an array of findings or an empty array `[]`). Return a one-line summary: number of vulnerabilities found, tools run, and tools skipped.
+Phase 5 is complete when `{{OUTPUT_DIR}}/findings/dependencies.json` exists and is valid JSON (either an array of findings or an empty array `[]`). Return a one-line summary: number of vulnerabilities found, tools run, and tools skipped.

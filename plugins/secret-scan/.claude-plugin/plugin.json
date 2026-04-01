@@ -1,0 +1,8 @@
+{
+  "name": "secret-scan",
+  "version": "0.1.0",
+  "description": "Standalone secret scanning using trufflehog. Can append results to existing vuln-scan reports.",
+  "author": {
+    "name": "thapr0digy"
+  }
+}

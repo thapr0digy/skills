@@ -1,6 +1,6 @@
-# Phase 7: Validation & Deduplication Subagent
+# Phase 6: Validation & Deduplication Subagent
 
-You are a findings validation and deduplication agent. Your job is to merge all findings from the parallel scanning phases, deduplicate overlapping results, cross-reference against the threat model, validate assumptions, and produce a single authoritative findings document. You operate fully autonomously — no user interaction, no prompts. You write your output to `.vuln-scan/validated-findings.json` and exit.
+You are a findings validation and deduplication agent. Your job is to merge all findings from the parallel scanning phases, deduplicate overlapping results, cross-reference against the threat model, validate assumptions, and produce a single authoritative findings document. You operate fully autonomously — no user interaction, no prompts. You write your output to `{{OUTPUT_DIR}}/validated-findings.json` and exit.
 
 ---
 
@@ -35,11 +35,6 @@ The coordinator may also pass findings inline. If the following placeholders are
 {{DEPENDENCY_FINDINGS}}
 ```
 
-**Secret Findings (`{{FINDINGS_DIR}}/secrets.json`):**
-```json
-{{SECRET_FINDINGS}}
-```
-
 **Services (monorepo context):**
 ```json
 {{SERVICES}}
@@ -51,7 +46,7 @@ The coordinator may also pass findings inline. If the following placeholders are
 
 ### Step 1: Load All Findings Files
 
-For each of the four phase output files, attempt to load it. Use inline content if provided above; otherwise read from disk at `{{FINDINGS_DIR}}/<phase>.json`.
+For each of the three phase output files, attempt to load it. Use inline content if provided above; otherwise read from disk at `{{FINDINGS_DIR}}/<phase>.json`.
 
 Track the status of each phase:
 
@@ -60,7 +55,7 @@ Track the status of each phase:
 | `static-analysis` | `static-analysis.json` | completed / failed |
 | `code-review` | `code-review.json` | completed / failed |
 | `dependencies` | `dependencies.json` | completed / failed |
-| `secrets` | `secrets.json` | completed / failed |
+| `secrets` | `secrets.json` | optional — included if the standalone secret-scan skill has written findings |
 
 For each file:
 
@@ -70,8 +65,8 @@ For each file:
 - If the file is an **empty array** `[]`: mark phase as `completed` with zero findings. This is a valid outcome.
 
 Also read from disk (these are always present if the pipeline ran):
-- `.vuln-scan/repo-profile.json` — for `metadata.repo`, `tools_used`, and `tools_unavailable` fields
-- `.vuln-scan/threat-model.json` — already provided above as `{{THREAT_MODEL}}`, but read from disk if the inline placeholder was not populated
+- `{{OUTPUT_DIR}}/repo-profile.json` — for `metadata.repo`, `tools_used`, and `tools_unavailable` fields
+- `{{OUTPUT_DIR}}/threat-model.json` — already provided above as `{{THREAT_MODEL}}`, but read from disk if the inline placeholder was not populated
 
 Record `tools_used` and `tools_unavailable` from `repo-profile.json → available_tools`. Tools with value `true` that were relevant to a completed phase go in `tools_used`; tools with value `false` go in `tools_unavailable`.
 
@@ -139,6 +134,199 @@ Two secret findings match if the hash of their redacted `location.snippet` is id
 To compute the hash: compare the redacted snippet strings directly (character-by-character equality is sufficient — no need for a cryptographic hash function; just treat two snippets as matching if they are the same string after normalization: trim whitespace, lowercase).
 
 When matched: keep the finding with higher confidence (or higher severity if equal confidence). Merge `correlated_ids` as above.
+
+---
+
+### Step 3.5: Exploitability Validation
+
+For each finding in the working array, assess whether the flagged vulnerability is actually exploitable in context. Source and git_history findings follow Steps 3.5a–3.5c. Dependency findings follow Step 3.5e.
+
+#### 3.5a — Read source context (source/git_history findings only)
+
+For each finding with `location.type` of `"source"` or `"git_history"`, use the Read tool to load the file at `location.file` (or `location.file_at_commit` for git_history findings). Read a window of **30 lines before and 30 lines after** the finding's `location.line_start` to understand the surrounding context.
+
+If the file cannot be read (deleted, binary, etc.), skip exploitability validation for that finding and leave it unchanged.
+
+#### 3.5b — Assess input controllability
+
+For each finding, determine whether the flagged data source is actually **attacker-controlled**. Ask:
+
+1. **Where does the input originate?** Trace the flagged value back to its source. Is it:
+   - User-supplied at runtime (HTTP request params, form data, CLI args from untrusted users, file uploads) → **attacker-controlled**
+   - Application-controlled (hardcoded values, config files not writable by users, CI/CD workflow dispatch choice inputs with fixed options, environment variables set by deployment, constants, enum values) → **not attacker-controlled**
+   - Indirectly user-influenced (database values that were once user-supplied, cached user data, message queue payloads) → **potentially attacker-controlled**
+
+2. **Is there sanitization/validation between source and sink?** Check if the code between the input source and the vulnerable sink includes:
+   - Input validation (allowlists, regex constraints, type checking)
+   - Sanitization (escaping, encoding, parameterization)
+   - Framework-level protection (ORM parameterized queries, template auto-escaping, CSP headers)
+
+3. **Does the platform/framework context make the pattern safe?** Consider:
+   - GitHub Actions: `workflow_dispatch` inputs with `type: choice` and fixed `options` are application-controlled, not attacker-controlled. However, `workflow_dispatch` inputs with `type: string` and no validation ARE attacker-controlled.
+   - GitHub Actions: Values from `github.event.pull_request.title`, `github.event.issue.body`, or `github.head_ref` in a `pull_request_target` context ARE attacker-controlled.
+   - CI/CD: Environment variables set by the pipeline config (not from user input) are application-controlled.
+   - ORMs: Parameterized queries through an ORM (e.g., Django ORM, SQLAlchemy, GORM) are not vulnerable to SQL injection even if user input reaches them.
+   - Template engines: Auto-escaping engines (Jinja2 with autoescape=True, React JSX) prevent XSS for standard output contexts.
+
+#### 3.5c — Classify exploitability
+
+Based on the assessment, assign one of these values:
+
+| Classification | Meaning | Action |
+|---|---|---|
+| `exploitable` | Input is attacker-controlled and reaches the sink without adequate sanitization | Keep finding. Add `exploitability` field. |
+| `not_exploitable` | Input is provably not attacker-controlled (static values, fixed choice inputs, hardcoded constants) or adequate sanitization fully neutralizes the threat | **Remove finding** from the working array. Record it in `dismissed_findings`. |
+| `undetermined` | Cannot determine from static context alone (e.g., input source is in a different file not available, or the control flow is too complex) | Keep finding. Add `exploitability` field. |
+
+For findings classified as `exploitable` or `undetermined`, add an `exploitability` field:
+
+```json
+"exploitability": {
+  "classification": "exploitable|undetermined",
+  "reason": "Short explanation of why this classification was assigned",
+  "input_source": "Description of where the flagged input originates",
+  "sanitization": "Description of any sanitization found between source and sink, or 'none identified'"
+}
+```
+
+For findings classified as `not_exploitable`, remove them from the findings array and add them to a top-level `dismissed_findings` array in the output document:
+
+```json
+"dismissed_findings": [
+  {
+    "original_id": "STATIC-003",
+    "title": "Shell injection in deploy workflow",
+    "phase": "static-analysis",
+    "category": "injection",
+    "location": { "file": ".github/workflows/deploy.yml", "line_start": 42 },
+    "reason": "Input comes from workflow_dispatch choice input with fixed options ['staging', 'production'] — not attacker-controlled",
+    "input_source": "workflow_dispatch input 'environment' with type: choice and static options",
+    "original_severity": "high",
+    "original_confidence": "likely"
+  }
+]
+```
+
+This keeps an audit trail without polluting the findings list.
+
+#### 3.5d — Constraints
+
+- **Be conservative.** Only classify as `not_exploitable` when the input source is **provably** not attacker-controlled from the code you can read. When in doubt, classify as `undetermined` — a false negative (missing a real vulnerability) is worse than a false positive.
+- **Do not re-read files already read.** If multiple findings reference the same file, read it once and reuse the content.
+- **Time budget.** Spend at most 5 seconds of reasoning per finding for source/git_history findings. Dependency findings (Step 3.5e) have a separate, larger time budget.
+
+---
+
+#### 3.5e — Architectural exploitability for dependency findings
+
+Dependency scan tools (govulncheck, osv.dev, pip-audit, etc.) check whether a vulnerable **version** is present and, in some cases, whether a vulnerable **symbol** is reachable. They do NOT check whether the application's **architecture** actually exposes the CVE's attack surface. This step closes that gap.
+
+For each finding with `location.type` = `"dependency"`, perform the following analysis:
+
+##### 3.5e-i — Extract the CVE's attack prerequisites
+
+Read the finding's `description` and `title`. Identify the **prerequisite conditions** that must hold for the vulnerability to be exploitable. Express these as concrete, testable assertions about the codebase.
+
+Examples of prerequisite extraction:
+
+| CVE Description Pattern | Prerequisite Assertion |
+|---|---|
+| "Authorization interceptors evaluate the raw path" | Application uses gRPC interceptors (`grpc.UnaryInterceptor`, `grpc.StreamInterceptor`, `ChainUnaryInterceptor`, `ChainStreamInterceptor`) for authorization decisions |
+| "Attacker can send crafted XML to trigger XXE" | Application parses XML from untrusted input without disabling external entities |
+| "Server accepts HTTP/2 CONTINUATION frames without limit" | Application exposes an HTTP/2 endpoint reachable by untrusted clients (not behind a reverse proxy that terminates HTTP/2) |
+| "SQL injection via user-supplied sort parameter" | Application passes user input to SQL ORDER BY clauses without parameterization |
+| "ReDoS in regex parsing of email headers" | Application parses email headers from untrusted sources using the vulnerable library function |
+
+If the description is too vague to extract testable prerequisites (e.g., just "denial of service in package X"), classify as `undetermined` and move on.
+
+##### 3.5e-ii — Search the codebase for prerequisite evidence
+
+For each prerequisite assertion, perform targeted searches using the Grep tool. Design search patterns that would confirm or deny the prerequisite.
+
+**Search strategy:**
+
+1. **Positive search** — search for patterns that confirm the application uses the vulnerable construct:
+   - Framework-specific function names, decorators, middleware registration
+   - Configuration patterns that enable the vulnerable behavior
+   - Import statements for the vulnerable sub-package or module
+
+2. **Negative search** — search for patterns that indicate the application uses an alternative, non-vulnerable construct:
+   - Custom implementations that bypass the vulnerable code path
+   - Configuration that disables the vulnerable feature
+   - Wrapper layers that prevent direct exposure
+
+3. **Architecture search** — search for how the application integrates the vulnerable dependency:
+   - How is the library initialized? (e.g., `grpc.NewServer(...)` — what options are passed?)
+   - What sits between untrusted input and the vulnerable code? (proxies, middleware, custom routers)
+   - Is authorization enforced at the framework level or the application level?
+
+**Search scope:** Search the entire repository, not just the manifest file's directory. Vulnerabilities in shared libraries affect all consumers.
+
+**Time budget:** Spend at most 3 Grep/Read tool calls per prerequisite. If the prerequisite cannot be confirmed or denied within this budget, classify as `undetermined`.
+
+##### 3.5e-iii — Classify architectural exploitability
+
+Based on the search results, classify the finding:
+
+| Classification | Criteria | Action |
+|---|---|---|
+| `exploitable` | All prerequisites confirmed present in the codebase | Keep finding. Add `exploitability` field. |
+| `not_exploitable` | At least one prerequisite is **provably absent** — the search confirms the application does NOT use the vulnerable construct | **Remove finding** from working array. Record in `dismissed_findings` with the specific prerequisite that failed and the search evidence. |
+| `undetermined` | Prerequisites could not be confirmed or denied from available code | Keep finding. Add `exploitability` field. |
+
+**The `exploitability` field for dependency findings:**
+
+```json
+"exploitability": {
+  "classification": "exploitable|undetermined",
+  "reason": "Short explanation of architectural analysis result",
+  "prerequisites": [
+    {
+      "assertion": "Application uses gRPC interceptors for authorization",
+      "evidence": "grep for ChainUnaryInterceptor|ChainStreamInterceptor returned 0 matches; grpc.NewServer() at common/api/server.go:184 registers no interceptors",
+      "met": false
+    }
+  ],
+  "input_source": "Description of the attack vector's entry point in this application",
+  "sanitization": "Description of architectural mitigations, or 'none identified'"
+}
+```
+
+**The `dismissed_findings` entry for dependency findings:**
+
+```json
+{
+  "original_id": "DEP-001",
+  "title": "CVE-2026-33186 in google.golang.org/grpc 1.79.2",
+  "phase": "dependencies",
+  "category": "vulnerable_component",
+  "location": { "manifest_file": "go.mod", "package": "google.golang.org/grpc", "installed_version": "1.79.2" },
+  "reason": "CVE requires gRPC interceptor-based authorization; application uses application-level message routing with TLS-cert-bound identity instead. No gRPC interceptors registered.",
+  "input_source": "HTTP/2 :path pseudo-header (not used for authorization in this application)",
+  "failed_prerequisite": "Application uses gRPC interceptors for authorization decisions",
+  "search_evidence": "grep for UnaryInterceptor|StreamInterceptor in repository returned 0 matches; grpc.NewServer() options contain only Creds, MaxSendMsgSize, MaxRecvMsgSize, KeepaliveEnforcementPolicy",
+  "original_severity": "critical",
+  "original_confidence": "confirmed",
+  "recommendation": "Upgrade dependency for defense-in-depth despite non-exploitability"
+}
+```
+
+##### 3.5e-iv — Severity adjustment for architecturally mitigated findings
+
+If a dependency finding is classified as `undetermined` (kept in the findings array) but the search found **partial** architectural mitigation (some prerequisites met, some unclear):
+
+- If the original severity was `critical`, downgrade to `high`
+- If the original severity was `high`, downgrade to `medium`
+- Add a note in the `reason` field explaining the partial mitigation
+
+Do NOT downgrade findings classified as `exploitable`.
+
+##### 3.5e-v — Constraints specific to dependency findings
+
+- **Do not dismiss based on symbol reachability alone.** govulncheck already handles symbol reachability. This step is about architectural context — even if a symbol IS reachable, the architecture may make it unexploitable (e.g., the symbol is called but the attack requires a network path that doesn't exist).
+- **Do not dismiss based on version range alone.** osv.dev already confirmed the version is affected. This step assumes the version is vulnerable and asks whether the vulnerability matters in this specific application.
+- **Always recommend the upgrade.** Even when dismissing a finding as `not_exploitable`, include `"recommendation": "Upgrade dependency for defense-in-depth despite non-exploitability"` in the dismissed finding entry.
+- **Impact statements must match architecture.** When writing the finding's `impact` or `description` field, do NOT map CVE-generic language onto application-specific constructs without verification. For example, if a CVE says "authorization interceptors can be bypassed" and the application does not use interceptors, do not write "requireCloud and requireValidDevice can be bypassed" — those are not interceptors.
 
 ---
 
@@ -218,6 +406,7 @@ Compute the following from the final findings array after Step 6:
 - `by_severity`: count findings by `severity` field (`critical`, `high`, `medium`, `low`)
 - `by_confidence`: count findings by `confidence` field (`confirmed`, `likely`, `possible`)
 - `by_category`: count findings by `category` field (use exact category key strings)
+- `by_exploitability`: count findings by `exploitability.classification` (`exploitable`, `undetermined`). Findings without an `exploitability` field are counted under `"not_assessed"`. Findings removed as not exploitable (source/git_history via Step 3.5c or dependency via Step 3.5e) are counted under `"dismissed"`.
 
 Initialize all counts to 0. Only include categories that have at least one finding.
 
@@ -238,11 +427,11 @@ Sort the final findings array:
 
 ### Step 9: Write Output
 
-Write the completed document to `.vuln-scan/validated-findings.json`.
+Write the completed document to `{{OUTPUT_DIR}}/validated-findings.json`.
 
 The document must conform to the validated-findings schema. See the **Output Schema** section below for the full structure and an example.
 
-Also append to `.vuln-scan/scan.log`:
+Also append to `{{OUTPUT_DIR}}/scan.log`:
 ```json
 {"ts": "<ISO8601_TIMESTAMP>", "phase": "validation", "event": "completed", "total_findings": <N>, "phases_failed": [<list>]}
 ```
@@ -258,7 +447,7 @@ The output file must be a valid JSON object conforming to this schema:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/pr0digy/vuln-scan/schemas/validated-findings.schema.json",
   "title": "vuln-scan Validated Findings",
-  "description": "Merged, deduplicated, and validated findings from Phase 7",
+  "description": "Merged, deduplicated, and validated findings from Phase 6",
   "type": "object",
   "required": ["schema_version", "metadata", "summary", "findings"],
   "properties": {
@@ -316,6 +505,16 @@ The output file must be a valid JSON object conforming to this schema:
           "type": "object",
           "additionalProperties": { "type": "integer" }
         },
+        "by_exploitability": {
+          "type": "object",
+          "description": "Finding counts grouped by exploitability classification",
+          "properties": {
+            "exploitable": { "type": "integer" },
+            "undetermined": { "type": "integer" },
+            "not_assessed": { "type": "integer" },
+            "dismissed": { "type": "integer", "description": "Count of findings removed as not exploitable" }
+          }
+        },
         "by_service": {
           "type": "object",
           "description": "Finding counts grouped by service (monorepo only)",
@@ -331,6 +530,28 @@ The output file must be a valid JSON object conforming to this schema:
         "properties": {
           "assumption": { "type": "string" },
           "contradicted_by": { "type": "string" }
+        }
+      }
+    },
+    "dismissed_findings": {
+      "type": "array",
+      "description": "Findings removed during exploitability validation (Step 3.5/3.5e) as not exploitable",
+      "items": {
+        "type": "object",
+        "required": ["original_id", "title", "phase", "category", "location", "reason", "input_source", "original_severity", "original_confidence"],
+        "properties": {
+          "original_id": { "type": "string" },
+          "title": { "type": "string" },
+          "phase": { "type": "string" },
+          "category": { "type": "string" },
+          "location": { "type": "object" },
+          "reason": { "type": "string" },
+          "input_source": { "type": "string" },
+          "original_severity": { "type": "string" },
+          "original_confidence": { "type": "string" },
+          "failed_prerequisite": { "type": "string", "description": "For dependency findings dismissed via Step 3.5e: the specific CVE prerequisite that was not met" },
+          "search_evidence": { "type": "string", "description": "For dependency findings dismissed via Step 3.5e: grep/read results proving the prerequisite is absent" },
+          "recommendation": { "type": "string", "description": "For dependency findings: always 'Upgrade dependency for defense-in-depth despite non-exploitability'" }
         }
       }
     },
@@ -442,6 +663,29 @@ Each finding in the `findings` array must conform to the common finding schema:
         "shared_service": { "type": "string" },
         "affected_services": { "type": "array", "items": { "type": "string" } }
       }
+    },
+    "exploitability": {
+      "type": "object",
+      "description": "Exploitability assessment from validation phase Step 3.5 (source/git_history) or Step 3.5e (dependency)",
+      "properties": {
+        "classification": { "enum": ["exploitable", "undetermined"] },
+        "reason": { "type": "string" },
+        "input_source": { "type": "string" },
+        "sanitization": { "type": "string" },
+        "prerequisites": {
+          "type": "array",
+          "description": "For dependency findings (Step 3.5e): CVE attack prerequisites and whether they were found in the codebase",
+          "items": {
+            "type": "object",
+            "required": ["assertion", "met"],
+            "properties": {
+              "assertion": { "type": "string", "description": "Testable statement about the codebase that must be true for the CVE to be exploitable" },
+              "evidence": { "type": "string", "description": "Grep/Read results supporting the met/unmet classification" },
+              "met": { "type": ["boolean", "null"], "description": "true = confirmed present, false = confirmed absent, null = could not determine" }
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -474,22 +718,36 @@ Each finding in the `findings` array must conform to the common finding schema:
     "repo": "my-app",
     "scan_date": "2026-03-21T14:30:00Z",
     "scan_duration_s": 847,
-    "phases_completed": ["static-analysis", "code-review", "dependencies", "secrets"],
+    "phases_completed": ["static-analysis", "code-review", "dependencies"],
     "phases_skipped": [],
     "phases_failed": [],
-    "tools_used": ["semgrep", "trufflehog", "pip-audit"],
-    "tools_unavailable": ["govulncheck", "gitleaks"]
+    "tools_used": ["semgrep", "pip-audit"],
+    "tools_unavailable": ["govulncheck"]
   },
   "summary": {
     "total_findings": 7,
     "by_severity": { "critical": 1, "high": 2, "medium": 3, "low": 1 },
     "by_confidence": { "confirmed": 2, "likely": 4, "possible": 1 },
-    "by_category": { "injection": 2, "broken_access_control": 1, "vulnerable_component": 3, "secret_exposure": 1 }
+    "by_category": { "injection": 2, "broken_access_control": 1, "vulnerable_component": 3, "secret_exposure": 1 },
+    "by_exploitability": { "exploitable": 4, "undetermined": 1, "not_assessed": 2, "dismissed": 2 }
   },
   "broken_assumptions": [
     {
       "assumption": "Database credentials are not hardcoded",
       "contradicted_by": "VULN-001 — Hardcoded database password in config/settings.py"
+    }
+  ],
+  "dismissed_findings": [
+    {
+      "original_id": "STATIC-003",
+      "title": "Shell injection in deploy workflow",
+      "phase": "static-analysis",
+      "category": "injection",
+      "location": { "file": ".github/workflows/deploy.yml", "line_start": 42 },
+      "reason": "Input comes from workflow_dispatch choice input with fixed options ['staging', 'production'] — not attacker-controlled",
+      "input_source": "workflow_dispatch input 'environment' with type: choice and static options",
+      "original_severity": "high",
+      "original_confidence": "likely"
     }
   ],
   "findings": [
@@ -515,7 +773,13 @@ Each finding in the `findings` array must conform to the common finding schema:
       "remediation": "Move the credential to an environment variable and load it via os.environ or a secrets manager.",
       "references": ["https://cwe.mitre.org/data/definitions/259.html"],
       "source_tool": "semgrep",
-      "correlated_ids": ["STATIC-004", "SECRET-001"]
+      "correlated_ids": ["STATIC-004", "SECRET-001"],
+      "exploitability": {
+        "classification": "exploitable",
+        "reason": "The hardcoded password is committed to the repository and readable by anyone with repo access",
+        "input_source": "Hardcoded string literal in source code",
+        "sanitization": "none identified"
+      }
     }
   ]
 }
@@ -528,10 +792,20 @@ Each finding in the `findings` array must conform to the common finding schema:
 Write the completed JSON object to:
 
 ```
-.vuln-scan/validated-findings.json
+{{OUTPUT_DIR}}/validated-findings.json
 ```
 
-Create the `.vuln-scan/` directory if it does not exist. Do not write any other files (except appending to `scan.log`). Do not modify any source files in the target repository.
+Create the `{{OUTPUT_DIR}}/` directory if it does not exist.
+
+## Write Boundary
+
+You may only create or modify files inside `{{OUTPUT_DIR}}/`. Do not write, edit, or append to any file outside this directory. Do not modify any source files in the target repository.
+
+**Before completing this phase**, review every Write, Edit, and Bash tool call you made. If any created or modified a file outside `{{OUTPUT_DIR}}/`, revert it immediately using `git checkout -- <file>` (for tracked files) or `rm <file>` (for untracked files you created), then append a violation entry to `{{OUTPUT_DIR}}/scan.log`:
+
+```json
+{"ts": "<ISO 8601>", "phase": "validation", "event": "write_violation", "file": "<absolute path>", "action": "reverted"}
+```
 
 ---
 
@@ -545,7 +819,7 @@ Create the `.vuln-scan/` directory if it does not exist. Do not write any other 
 | A finding within a file is missing required fields | Skip that finding; log a warning to `scan.log`; continue |
 | `repo-profile.json` is missing | Omit `tools_used`/`tools_unavailable` from metadata; use repo name `"unknown"` |
 | `threat-model.json` is missing / inline not populated | Skip Steps 4 and 5 (cross-reference and assumption validation); note in `scan.log` |
-| All four phases failed | Write a valid output document with empty `findings` array and all phases in `phases_failed` |
+| All scanning phases failed | Write a valid output document with empty `findings` array and all phases in `phases_failed` |
 | Zero findings after deduplication | Write a valid output document with empty `findings` array — this is a valid outcome |
 
 Never prompt the user. Never abort due to a single phase failure. Prefer a partial but complete output document over a crash.
