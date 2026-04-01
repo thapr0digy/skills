@@ -95,17 +95,34 @@ Initialize the scan log by writing the following JSON line to `{OUTPUT_DIR}/scan
 
 ---
 
+## Step 4b — Phase 1b: Entry Point Map
+
+**Goal:** Produce `{OUTPUT_DIR}/entry-points.json`.
+
+1. Use the Read tool to read `{SKILL_DIR}/phases/entry-point-map.md`.
+2. Replace every occurrence of `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
+3. Replace every occurrence of `{{TARGET_PATH}}` with the actual value of `TARGET_PATH`.
+4. Replace every occurrence of `{{OUTPUT_DIR}}` with the actual value of `OUTPUT_DIR`.
+5. Dispatch the prepared prompt as a subagent. Description: `"Run Phase 1b entry point map"`.
+6. Wait for the subagent to return.
+7. Use the Read tool to load `{OUTPUT_DIR}/entry-points.json`.
+   - **If the file exists and is valid JSON:** store its contents as `ENTRY_POINTS`. Append a `completed` log entry: `{"ts": "<timestamp>", "phase": "entry-point-map", "event": "completed", "duration_s": <elapsed>}`
+   - **If the file is missing or invalid:** store `ENTRY_POINTS` as `{}`. Append a `failed` log entry: `{"ts": "<timestamp>", "phase": "entry-point-map", "event": "failed", "reason": "entry-points.json missing or invalid, downstream phases will use fallback behavior"}`. Do not abort.
+
+---
+
 ## Step 5 — Phase 2: Threat Model
 
 **Goal:** Produce `{OUTPUT_DIR}/threat-model.json`.
 
 1. Use the Read tool to read `{SKILL_DIR}/phases/threat-model.md`.
 2. Replace every occurrence of `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
-3. Replace `{{OUTPUT_DIR}}` with the actual value of `OUTPUT_DIR`.
-4. Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
-5. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 2 threat model"`.
-6. Wait for the subagent to return.
-7. Use the Read tool to load `{OUTPUT_DIR}/threat-model.json`.
+3. Replace every occurrence of `{{ENTRY_POINTS}}` with the contents of `ENTRY_POINTS`.
+4. Replace `{{OUTPUT_DIR}}` with the actual value of `OUTPUT_DIR`.
+5. Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
+6. Dispatch the prepared prompt as an Agent subagent. Description: `"Run Phase 2 threat model"`.
+7. Wait for the subagent to return.
+8. Use the Read tool to load `{OUTPUT_DIR}/threat-model.json`.
    - **If the file exists and is valid JSON:** store its contents as `THREAT_MODEL`. Append a `completed` log entry.
    - **If the file is missing or invalid:** store `THREAT_MODEL` as the string `{}`. Append a `failed` log entry with `"reason": "threat model output missing, continuing with empty model"`. Do not abort — partial results are acceptable.
 
@@ -255,7 +272,7 @@ Every log entry is a single JSON object written as one line. Append entries with
 - `failed` — phase produced no usable output; include `"reason": "<string>"`
 - `skipped` — phase was intentionally bypassed; include `"reason": "<string>"`
 
-**Phase names:** `coordinator`, `recon`, `threat-model`, `static-analysis`, `code-review`, `dependency-scan`, `validation`, `reporting`, `parallel-dispatch`
+**Phase names:** `coordinator`, `recon`, `entry-point-map`, `threat-model`, `static-analysis`, `code-review`, `dependency-scan`, `validation`, `reporting`, `parallel-dispatch`
 
 ---
 
