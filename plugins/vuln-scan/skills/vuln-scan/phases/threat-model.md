@@ -21,6 +21,13 @@ The repository profile from Phase 1 is provided below:
 
 If the services array is non-empty, this is a monorepo scan. Apply the monorepo-specific rules in each step below.
 
+**Entry Points (Phase 1b — call graph expanded attack surfaces):**
+```json
+{{ENTRY_POINTS}}
+```
+
+If this field is `{}` or contains an empty `entry_points` array, Phase 1b did not complete successfully. In that case, infer file lists for `high_risk_paths` from the repo structure and security surface as before (existing behavior).
+
 ---
 
 ## Step 1: Try the `openai-security-threat-model` Skill
@@ -158,10 +165,20 @@ Within each tier, prefer paths that:
 - Call external services (SSRF risk)
 - Handle credentials, tokens, or session data
 
+**File list resolution (new):**
+
+For each high-risk path:
+1. Find the matching entry point in `{{ENTRY_POINTS}}.entry_points` by matching the path's handler or file against entry point `handler` or `defined_in` fields.
+2. If a match is found, set `files` from the matching entry point's `files` array (ordered from entry point file to deepest implementation). Set `entry_point_id` to the matching entry point's `id`.
+3. Set `shared_files_needed` to the subset of `{{ENTRY_POINTS}}.shared_files` that are relevant to this path's attack surface (auth middleware for auth-related paths, DB connection for DB-access paths, etc.). Use your judgment — include a file if you believe a code review agent would need to understand it to assess this path's risk.
+4. If no match is found in `{{ENTRY_POINTS}}` (or `{{ENTRY_POINTS}}` is empty), infer `files` from the repo structure as before. Set `entry_point_id` to `null` and `shared_files_needed` to `[]`.
+
 Each path must include:
 - `description`: one sentence explaining *why* this path is risky (not just what it does)
 - `files`: the specific files involved, ordered from entry point to data sink
 - `priority`: integer starting at 1, no ties
+- `entry_point_id` (null if not matched)
+- `shared_files_needed` (empty array if none)
 
 Limit to 20 paths maximum.
 
@@ -257,18 +274,17 @@ Write your result as a single JSON object conforming to this schema:
   "high_risk_paths": [
     {
       "description": "Unauthenticated search endpoint passes raw user input to a repository method that constructs SQL, creating a direct injection path with no auth gate",
+      "entry_point_id": "EP-001",
       "files": ["src/api/routes/search.py", "src/repositories/search_repo.py"],
+      "shared_files_needed": ["src/middleware/auth.py"],
       "priority": 1
     },
     {
       "description": "File upload handler does not appear to validate MIME type or restrict destination path before writing to disk",
+      "entry_point_id": "EP-003",
       "files": ["src/api/routes/upload.py", "src/storage/local.py"],
+      "shared_files_needed": [],
       "priority": 2
-    },
-    {
-      "description": "Admin route grants privilege elevation based on a user-supplied role claim without verifying against a server-side permission store",
-      "files": ["src/api/routes/admin.py", "src/auth/middleware.py"],
-      "priority": 3
     }
   ],
   "assumptions": [
