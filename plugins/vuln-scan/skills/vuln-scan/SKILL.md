@@ -132,35 +132,90 @@ Initialize the scan log by writing the following JSON line to `{OUTPUT_DIR}/scan
 
 **Goal:** Run static analysis, code review, and dependency scan simultaneously.
 
-### 6a — Prepare all three prompts
+### 6a — Prepare all prompts
 
-Use the Read tool three times (may be parallelized) to load:
-- `{SKILL_DIR}/phases/static-analysis.md`
-- `{SKILL_DIR}/phases/code-review.md`
-- `{SKILL_DIR}/phases/dependency-scan.md`
+**6a-i — Load phase templates**
 
-For each loaded text, perform the following replacements (skip a replacement if that placeholder does not appear in the file):
-- Replace `{{REPO_PROFILE}}` with the contents of `REPO_PROFILE`.
-- Replace `{{THREAT_MODEL}}` with the contents of `THREAT_MODEL`.
-- Replace `{{OUTPUT_DIR}}` with the actual value of `OUTPUT_DIR`.
-- Replace `{{SERVICES}}` with the `services` array from `REPO_PROFILE` (extracted as a JSON array string). If `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`.
+Use the Read tool (may be parallelized) to load:
+- `{SKILL_DIR}/phases/static-analysis.md` — perform replacements: `{{REPO_PROFILE}}` → `REPO_PROFILE`, `{{THREAT_MODEL}}` → `THREAT_MODEL`, `{{SERVICES}}` → services array from `REPO_PROFILE`, `{{OUTPUT_DIR}}` → `OUTPUT_DIR`, `{{ENTRY_POINTS}}` → `ENTRY_POINTS`. Store the result as the prepared static-analysis prompt.
+- `{SKILL_DIR}/phases/dependency-scan.md` — perform replacements: `{{REPO_PROFILE}}` → `REPO_PROFILE`, `{{OUTPUT_DIR}}` → `OUTPUT_DIR`, `{{SERVICES}}` → services array from `REPO_PROFILE`. Store the result as the prepared dependency-scan prompt.
+- `{SKILL_DIR}/phases/code-review.md` — load as a template only. Do NOT dispatch it directly. Store as `CODE_REVIEW_TEMPLATE`.
 
-### 6b — Dispatch all three agents in a single message
+For all replacements, if `is_monorepo` is `false` in the repo profile, replace `{{SERVICES}}` with `[]`. Skip a replacement if that placeholder does not appear in the file.
 
-**CRITICAL:** You MUST invoke all three Agent tool calls in a single response message. This triggers parallel execution. Do not send them in separate messages.
+**6a-ii — Form path groups**
 
-Use these descriptions:
-- Static analysis agent: `"Run Phase 3 static analysis"`
-- Code review agent: `"Run Phase 4 code review"`
-- Dependency scan agent: `"Run Phase 5 dependency scan"`
+Read `high_risk_paths` from `THREAT_MODEL`. Group them in priority order:
+
+For each path, estimate its token cost:
+
+```bash
+# Sum the byte sizes of all unique files in this path
+total=0
+for f in <path.files>; do
+  size=$(wc -c < "{TARGET_PATH}/$f" 2>/dev/null || echo 0)
+  total=$((total + size))
+done
+echo $total
+```
+
+Note: In SKILL.md coordinator steps, `{TARGET_PATH}` is the resolved variable (no double-braces). Double-brace `{{PLACEHOLDER}}` syntax is only used inside phase files dispatched as subagent prompts.
+
+Use 4 bytes ≈ 1 token as a proxy.
+
+Read `code_review_token_budget` from `{OUTPUT_DIR}/config.json` (default: `60000`).
+Read `code_review_group_size` from `{OUTPUT_DIR}/config.json` (default: `5`).
+
+Assign paths to groups:
+- Start group 1. Add paths in priority order.
+- After adding each path, check: if group path count ≥ `code_review_group_size` OR cumulative token estimate ≥ `code_review_token_budget`, start a new group.
+- Token budget check takes precedence: if adding a path would exceed the budget, start a new group first even if path count < `code_review_group_size`.
+- A single path whose files alone exceed `code_review_token_budget` forms its own group.
+
+Result: an array of group objects, each with `group_id` (integer, starting at 1) and `paths` (array of path objects).
+
+**6a-iii — Pre-load shared files per group**
+
+For each group, collect the union of `shared_files_needed` across all paths in the group. Read each file:
+
+```bash
+cat "{TARGET_PATH}/<shared_file_path>"
+```
+
+Build a JSON object mapping file path → file content: `{"internal/middleware/auth.go": "<content>", ...}`.
+
+Store this as the group's `SHARED_FILES_CONTENT`.
+
+**6a-iv — Prepare one prompt per group**
+
+For each group, take the `CODE_REVIEW_TEMPLATE` and perform these replacements:
+- Replace `{{GROUP_ASSIGNMENT}}` with a JSON object: `{"group_id": <N>, "paths": [<path objects>]}`
+- Replace `{{SHARED_FILES_CONTENT}}` with the pre-loaded shared files JSON for this group
+- Replace `{{REPO_PROFILE}}` with `REPO_PROFILE`
+- Replace `{{THREAT_MODEL}}` with `THREAT_MODEL`
+- Replace `{{SERVICES}}` with the services array from `REPO_PROFILE`
+- Replace `{{OUTPUT_DIR}}` with `OUTPUT_DIR`
+- Replace `{{GROUP_ID}}` with the group's integer ID
+
+### 6b — Dispatch all agents in a single message
+
+**CRITICAL:** You MUST invoke all agent tool calls in a single response message. This triggers parallel execution.
+
+Dispatch:
+- Static analysis agent: prepared `static-analysis.md` prompt. Description: `"Run Phase 3 static analysis"`
+- **One agent per code review group**: use each group's prepared prompt from 6a-iv. Description: `"Run Phase 4 code review group {group_id}"`
+- Dependency scan agent: prepared `dependency-scan.md` prompt. Description: `"Run Phase 5 dependency scan"`
+
+Example for 3 groups: dispatch 5 agents total (1 static + 3 code review + 1 dependency) in one message.
 
 ### 6c — Handle results
 
-After all three subagents return, append a log entry for each:
-- `{"ts": "<timestamp>", "phase": "<phase-name>", "event": "completed", "duration_s": <elapsed>}`
-- `{"ts": "<timestamp>", "phase": "<phase-name>", "event": "failed", "reason": "<short reason>"}`
+After all subagents return, append a log entry for each:
+- Static analysis: `{"ts": "<timestamp>", "phase": "static-analysis", "event": "completed/failed", ...}`
+- Each code review group: `{"ts": "<timestamp>", "phase": "code-review", "group_id": <N>, "event": "completed/failed", ...}`
+- Dependency scan: `{"ts": "<timestamp>", "phase": "dependency-scan", "event": "completed/failed", ...}`
 
-If the parallel dispatch itself fails (e.g., tool error before any agent runs), fall back to dispatching each of the three agents sequentially, one at a time, with separate Agent tool calls. Log a `skipped` entry for parallel mode:
+If parallel dispatch fails, fall back to dispatching each agent sequentially. For code review groups, dispatch group 1 first, then group 2, etc. Log a `skipped` entry for parallel mode:
 
 ```json
 {"ts": "<timestamp>", "phase": "parallel-dispatch", "event": "skipped", "reason": "parallel dispatch failed, falling back to sequential"}
