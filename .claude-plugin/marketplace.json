@@ -50,6 +50,13 @@
       "description": "Target prioritization and attack surface analysis for penetration testing engagements. Synthesizes recon, enumeration, and scanning data to recommend high-value targets.",
       "author": { "name": "thapr0digy" },
       "source": "./plugins/pentest-analysis"
+    },
+    {
+      "name": "pentest-scanning",
+      "version": "0.1.0",
+      "description": "Vulnerability scanning and custom template generation for penetration testing engagements. Nuclei-based scanning with tech-stack-aware template selection and custom template creation.",
+      "author": { "name": "thapr0digy" },
+      "source": "./plugins/pentest-scanning"
     }
   ]
 }
