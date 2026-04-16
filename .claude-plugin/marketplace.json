@@ -16,6 +16,15 @@
         "name": "thapr0digy"
       },
       "source": "./plugins/vuln-scan"
+    },
+    {
+      "name": "pentest-core",
+      "version": "0.1.0",
+      "description": "Core infrastructure for offensive security engagements. Manages engagement configuration, scope validation, remote execution, evidence organization, and Plextrac-compatible finding export.",
+      "author": {
+        "name": "thapr0digy"
+      },
+      "source": "./plugins/pentest-core"
     }
   ]
 }
