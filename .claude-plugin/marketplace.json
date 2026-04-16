@@ -57,6 +57,13 @@
       "description": "Vulnerability scanning and custom template generation for penetration testing engagements. Nuclei-based scanning with tech-stack-aware template selection and custom template creation.",
       "author": { "name": "thapr0digy" },
       "source": "./plugins/pentest-scanning"
+    },
+    {
+      "name": "pentest-exploit",
+      "version": "0.1.0",
+      "description": "Exploitation guidance and credential attack skills for penetration testing engagements. Expert-assisted exploit selection, payload generation, and password spraying/cracking.",
+      "author": { "name": "thapr0digy" },
+      "source": "./plugins/pentest-exploit"
     }
   ]
 }
