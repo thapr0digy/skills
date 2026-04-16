@@ -64,6 +64,13 @@
       "description": "Exploitation guidance and credential attack skills for penetration testing engagements. Expert-assisted exploit selection, payload generation, and password spraying/cracking.",
       "author": { "name": "thapr0digy" },
       "source": "./plugins/pentest-exploit"
+    },
+    {
+      "name": "pentest-postexploit",
+      "version": "0.1.0",
+      "description": "Active Directory attack chains and post-exploitation skills for penetration testing engagements. AD exploitation, privilege escalation, lateral movement, loot collection, and detection rule generation.",
+      "author": { "name": "thapr0digy" },
+      "source": "./plugins/pentest-postexploit"
     }
   ]
 }
