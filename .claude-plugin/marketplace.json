@@ -34,6 +34,15 @@
         "name": "thapr0digy"
       },
       "source": "./plugins/pentest-recon"
+    },
+    {
+      "name": "pentest-enum",
+      "version": "0.1.0",
+      "description": "Enumeration skills for penetration testing engagements. Web application, network service, and cloud infrastructure enumeration.",
+      "author": {
+        "name": "thapr0digy"
+      },
+      "source": "./plugins/pentest-enum"
     }
   ]
 }
