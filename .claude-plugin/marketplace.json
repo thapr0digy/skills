@@ -43,6 +43,13 @@
         "name": "thapr0digy"
       },
       "source": "./plugins/pentest-enum"
+    },
+    {
+      "name": "pentest-analysis",
+      "version": "0.1.0",
+      "description": "Target prioritization and attack surface analysis for penetration testing engagements. Synthesizes recon, enumeration, and scanning data to recommend high-value targets.",
+      "author": { "name": "thapr0digy" },
+      "source": "./plugins/pentest-analysis"
     }
   ]
 }
