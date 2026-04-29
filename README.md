@@ -26,20 +26,48 @@ Then install individual plugins:
 
 ### Penetration Testing Suite
 
-A modular set of plugins covering the full offensive security engagement lifecycle.
+A modular set of plugins covering the full offensive security engagement lifecycle, with built-in safety policies for sensitive data handling and credential validation.
 
 | Plugin | Description |
 |--------|-------------|
-| [pentest-core](plugins/pentest-core/) | Engagement management — configuration, scope validation, remote execution, evidence organization, Plextrac-compatible export. |
-| [pentest-recon](plugins/pentest-recon/) | Passive and active reconnaissance — subdomain enumeration, port scanning, service fingerprinting, OSINT, attack surface discovery. |
-| [pentest-enum](plugins/pentest-enum/) | Enumeration of web apps, network services, and cloud infrastructure. |
+| [pentest-core](plugins/pentest-core/) | Engagement management, scope validation, remote execution, evidence organization, Plextrac-compatible export, and shared safety policies. |
+| [pentest-recon](plugins/pentest-recon/) | Passive and active reconnaissance — two-phase port scanning, subdomain enumeration, service fingerprinting, OSINT, JS analysis, attack surface discovery. |
+| [pentest-enum](plugins/pentest-enum/) | Enumeration of web apps (ffuf + katana + httpx), network services, JS analysis (auto-triggered), and cloud infrastructure. |
 | [pentest-analysis](plugins/pentest-analysis/) | Target prioritization — synthesizes recon/enum/scan data to recommend high-value attack paths. |
 | [pentest-scanning](plugins/pentest-scanning/) | Nuclei-based vulnerability scanning with tech-stack-aware template selection and custom template generation. |
-| [pentest-exploit](plugins/pentest-exploit/) | Exploitation guidance, payload generation, and credential attacks (password spraying, hash cracking). |
-| [pentest-postexploit](plugins/pentest-postexploit/) | Active Directory attack chains, privilege escalation, lateral movement, loot collection, and detection rules. |
+| [pentest-exploit](plugins/pentest-exploit/) | Exploitation guidance, payload generation, and credential attacks with tiered sensitive data access controls. |
+| [pentest-postexploit](plugins/pentest-postexploit/) | Active Directory attack chains, privilege escalation, tiered lateral movement, loot collection, and detection rules. |
 | [pentest-evasion](plugins/pentest-evasion/) | Defense evasion — payload obfuscation, AMSI/ETW bypass, LOLBins, process injection, C2 comms. **RoE-gated.** |
 | [pentest-social](plugins/pentest-social/) | Phishing campaign setup, email templates, infrastructure configuration, results parsing. **RoE-gated.** |
 | [pentest-utility](plugins/pentest-utility/) | Finding report writing, engagement cleanup checklists, remediation retesting. |
+
+## Safety Policies
+
+The pentest suite enforces two shared safety policies across all skills that handle credentials or sensitive data:
+
+### Sensitive Data Policy
+
+Defines a 3-tier validation hierarchy to minimize unnecessary exposure of PII, PHI, and financial data:
+
+| Tier | What it does | Example |
+|------|-------------|---------|
+| **1 — Metadata** | Proves access exists using structure only | `sqlmap --dbs`, `--tables`, `--current-user`; `whoami`; `/api/health` |
+| **2 — Non-sensitive data** | Proves read access without user data | Config tables, roles/permissions, application settings |
+| **3 — Sensitive data** | Retrieves actual user records (requires confirmation) | `sqlmap --dump` on user tables; browser credential stores; `/etc/shadow` |
+
+Skills always attempt Tier 1 first and only escalate with explicit tester approval.
+
+### Safe Authentication Validation Policy
+
+Defines a 3-tier hierarchy for credential validation to avoid destructive side effects:
+
+| Tier | What it does | Example |
+|------|-------------|---------|
+| **1 — Read-only probes** | Confirms credential validity without side effects | `crackmapexec smb` (no `-x`); `ssh ... exit`; RDP `+auth-only` |
+| **2 — Identity confirmation** | Confirms access level | `whoami /groups`; `--shares`; `--admin-count` |
+| **3 — Interactive sessions** | Opens shells, executes commands (requires confirmation) | `impacket-psexec`; `evil-winrm`; `crackmapexec -x` |
+
+Credential validation always uses Tier 1 first. Interactive exploitation requires explicit tester confirmation.
 
 ## Skill Reference
 
@@ -72,16 +100,16 @@ A modular set of plugins covering the full offensive security engagement lifecyc
 ### pentest-recon
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| recon-passive | `/recon-passive` | OSINT, subdomain enumeration, cloud asset discovery, leaked credentials. |
-| recon-active | `/recon-active` | Port scanning, service fingerprinting, web tech detection, SSL/TLS scanning. |
+| recon-passive | `/recon-passive [domain]` | OSINT, subdomain enumeration (root domains only), URL discovery (gau + waybackurls), auto JS analysis, cloud assets, leaked credentials. |
+| recon-active | `/recon-active [target]` | Two-phase port scanning (top 1000 sync + full 65535 async), service fingerprinting, HTTP probing, web tech detection, WAF detection, screenshots (gowitness), SSL/TLS scanning (tlsx on all web services). |
 
 ### pentest-enum
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| enum-web | `/enum-web` | Web/API enumeration — fuzzing, crawling, CMS detection, GraphQL, auth. |
-| enum-network | `/enum-network` | SMB, LDAP/AD, SNMP, DNS, RDP/SSH/WinRM, SMTP, FTP, databases, IPMI. |
-| enum-cloud | `/enum-cloud` | AWS, Azure, GCP — IAM, storage, compute, multi-cloud auditing. |
-| enum-js | `/enum-js` | Extract endpoints, secrets, API keys from JS using jsluice. |
+| enum-web | `/enum-web [url]` | Web/API enumeration — requires ffuf + katana + httpx. Auto-triggers JS analysis (jsluice + trufflehog) when JS files found. CMS detection, GraphQL, auth enumeration, CORS testing. |
+| enum-network | `/enum-network [target]` | SMB, LDAP/AD, SNMP, DNS, RDP/SSH/WinRM, SMTP, FTP, databases, IPMI. |
+| enum-cloud | `/enum-cloud [provider]` | AWS, Azure, GCP — IAM, storage, compute, multi-cloud auditing. |
+| enum-js | `/enum-js [target]` | Standalone JavaScript analysis — endpoint extraction, secret detection, API key discovery via jsluice. |
 
 ### pentest-analysis
 | Skill | Invocation | Purpose |
@@ -91,37 +119,37 @@ A modular set of plugins covering the full offensive security engagement lifecyc
 ### pentest-scanning
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| scan-vuln | `/scan-vuln` | Nuclei scanning with tech-stack-aware template selection. |
-| nuclei-template | `/nuclei-template` | Generate custom nuclei YAML templates from natural-language descriptions. |
+| scan-vuln | `/scan-vuln [target]` | Nuclei scanning with tech-stack-aware template selection. |
+| nuclei-template | `/nuclei-template <description>` | Generate custom nuclei YAML templates from natural-language descriptions. |
 
 ### pentest-exploit
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| exploit-assist | `/exploit-assist` | Exploit search, payload generation, web exploitation (SQLi, SSTI, SSRF, XXE, deserialization). |
-| attack-creds | `/attack-creds [mode]` | Password spraying, hash cracking, credential stuffing with lockout-safe defaults. |
+| exploit-assist | `/exploit-assist [target]` | Exploit search, payload generation, web exploitation (SQLi, SSTI, SSRF, XXE, deserialization). Tiered data access — prefers metadata over sensitive data dumps. |
+| attack-creds | `/attack-creds [mode]` | Password spraying, hash cracking, credential stuffing. Lockout-safe defaults, Tier 1 read-only validation of discovered credentials. |
 
 ### pentest-postexploit
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| post-exploit | `/post-exploit` | Situational awareness, privesc, lateral movement, pivoting, loot, persistence (RoE-gated). |
+| post-exploit | `/post-exploit` | Situational awareness, privesc, tiered lateral movement (validate → identify → exploit), tiered loot collection, persistence (RoE-gated), detection rules. |
 | attack-ad | `/attack-ad` | Kerberoasting, AS-REP Roasting, DCSync, delegation abuse, ACL abuse, ADCS, NTLM relay. |
 
 ### pentest-evasion
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| evade | `/evade` | Payload obfuscation, AMSI/ETW bypass, LOLBins, process injection, C2, covering tracks. |
+| evade | `/evade [technique]` | Payload obfuscation, AMSI/ETW bypass, LOLBins, process injection, C2, covering tracks. |
 
 ### pentest-social
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| phish | `/phish` | Phishing campaign setup, email generation, infrastructure, results parsing. |
+| phish | `/phish [mode]` | Phishing campaign setup, email generation, infrastructure, results parsing. |
 
 ### pentest-utility
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| finding-write | `/finding-write` | Draft pentest findings with CVSS scoring, CWE mapping, compliance tagging. |
+| finding-write | `/finding-write [input]` | Draft pentest findings with CVSS scoring, CWE mapping, compliance tagging. |
 | pentest-cleanup | `/pentest-cleanup` | Generate a cleanup checklist from the engagement activity log. |
-| pentest-retest | `/pentest-retest` | Verify remediation of previously reported findings. |
+| pentest-retest | `/pentest-retest [finding-id]` | Verify remediation of previously reported findings. |
 
 ## Rules of Engagement (RoE) Gating
 
