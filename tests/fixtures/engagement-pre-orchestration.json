@@ -1,0 +1,23 @@
+{
+  "engagement_id": "fixture-pre-orchestration",
+  "client_name": "Fixture Client",
+  "type": "external",
+  "dates": { "start": "2026-04-01", "end": "2026-04-21" },
+  "output_dir": "/tmp/engagements/fixture-pre-orchestration",
+  "scope": {
+    "in_scope": [
+      { "type": "domain", "value": "example.com", "added_at": "2026-04-01T12:00:00Z" }
+    ],
+    "out_of_scope": []
+  },
+  "roe": {
+    "testing_windows": [],
+    "restricted_techniques": [],
+    "social_engineering_permitted": false,
+    "defense_evasion_permitted": false
+  },
+  "testers": [{ "handle": "fixture-tester", "name": "Fixture Tester" }],
+  "remote_hosts": {},
+  "emergency_contacts": [],
+  "tool_inventory": {}
+}
