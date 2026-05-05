@@ -1,0 +1,8 @@
+{
+  "name": "tmux-notify",
+  "version": "0.1.0",
+  "description": "Renames the active tmux window to a visible marker (⚠ CLAUDE) whenever Claude Code is waiting on user input, and restores the original name once you respond.",
+  "author": {
+    "name": "thapr0digy"
+  }
+}

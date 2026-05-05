@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/tmux-claude-waiting.sh on"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/tmux-claude-waiting.sh off"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/tmux-claude-waiting.sh off"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/tmux-claude-waiting.sh off"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/tmux-claude-waiting.sh off"
+          }
+        ]
+      }
+    ]
+  }
+}
