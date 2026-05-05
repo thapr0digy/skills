@@ -1,0 +1,25 @@
+client_name: NonInteractive Fixture
+type: external
+scope:
+  in_scope:
+    - type: domain
+      value: example.com
+    - type: cidr
+      value: 10.0.0.0/24
+  out_of_scope: []
+roe:
+  testing_windows: []
+  restricted_techniques: []
+  social_engineering_permitted: false
+  defense_evasion_permitted: false
+  rate_limits:
+    requests_per_second_per_target: 25
+    parallel_workers_per_phase: 2
+    parallel_research_workers: 2
+    scan_threads: 5
+    default_phase_deadline_seconds: 900
+    research_worker_deadline_seconds: 180
+testers:
+  - handle: fixture-tester
+    name: Fixture Tester
+breach_db_permitted: false
