@@ -1,0 +1,10 @@
+{
+  "engagement_id": "fixture-active",
+  "client_name": "Fixture Active Client",
+  "output_dir": "/tmp/fixture-active-output",
+  "type": "external",
+  "scope": {"in_scope": [{"type": "domain", "value": "example.com", "added_at": "2026-05-05T00:00:00Z"}], "out_of_scope": []},
+  "current_phase": "enum-web",
+  "last_supervised_at": null,
+  "status": "running"
+}
