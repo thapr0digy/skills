@@ -1,0 +1,6 @@
+{
+  "phase": "enum-web", "batch_id": "batch-T", "worker_id": "worker-1", "status": "ok",
+  "targets_processed": ["acme.com"],
+  "artifacts": ["/tmp/inline-checks-output/enum/web/acme.com/dirs.json"],
+  "services_discovered": [], "errors": [], "duration_seconds": 30.0
+}
