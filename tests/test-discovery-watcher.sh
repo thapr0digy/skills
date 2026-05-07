@@ -87,6 +87,24 @@ else
   FAILS=$((FAILS + 1))
 fi
 
+# --- Symlink under recon/ pointing outside ACTIVE_OUTPUT_DIR → must not queue ---
+# Create a target file outside the output dir and a symlink inside recon/ pointing at it
+outside_target="$WORK/outside-target.jsonl"
+printf '{"host":"evil.com","port":9999,"product":"malware","version":"1.0"}\n' > "$outside_target"
+mkdir -p "$OUT/recon/active"
+ln -sf "$outside_target" "$OUT/recon/active/escape.jsonl"
+# Reset _pending state so we can detect fresh queuing
+rm -f "$OUT/research/_pending.jsonl"
+symlink_input=$(jq -nc --arg p "$OUT/recon/active/escape.jsonl" \
+  '{hook_event_name:"PostToolUse", tool_name:"Write", tool_input:{file_path:$p}, tool_response:{success:true}}')
+printf '%s' "$symlink_input" | ACTIVE_ENGAGEMENT_LINK="$WORK/active-engagement" bash "$HOOK"
+if [ ! -f "$OUT/research/_pending.jsonl" ]; then
+  echo "PASS: symlink outside output dir not queued"
+else
+  echo "FAIL: hook followed symlink that escapes output dir"
+  FAILS=$((FAILS + 1))
+fi
+
 rm -rf "$WORK"
 
 if [ "$FAILS" -gt 0 ]; then
