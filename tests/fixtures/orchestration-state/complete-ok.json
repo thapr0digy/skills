@@ -1,0 +1,20 @@
+{
+  "engagement_id": "fixture-d1",
+  "completed_at": "2026-05-07T20:00:00Z",
+  "phase_durations": {
+    "recon-passive": 1620.5,
+    "recon-active": 1740.0,
+    "enum-web": 4200.2,
+    "scan-vuln": 1800.0,
+    "exploit-assist": 900.0,
+    "finding-write": 600.0,
+    "pentest-export": 240.0
+  },
+  "finding_count": 17,
+  "scope_coverage_pct": 92,
+  "supervisor_verdict_history": [
+    {"phase": "recon-passive", "verdict": "proceed", "timestamp": "2026-05-07T14:32:00Z"},
+    {"phase": "enum-web", "verdict": "replan", "timestamp": "2026-05-07T15:30:00Z"},
+    {"phase": "enum-web", "verdict": "proceed", "timestamp": "2026-05-07T17:15:00Z"}
+  ]
+}

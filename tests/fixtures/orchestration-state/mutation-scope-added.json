@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-05-07T15:32:00Z",
+  "source": "amendment",
+  "actor": "user",
+  "mutation_kind": "scope_added",
+  "before": {"in_scope": [{"type": "domain", "value": "acme.com"}]},
+  "after": {"in_scope": [{"type": "domain", "value": "acme.com"}, {"type": "domain", "value": "shop.acme.com"}]},
+  "reason": "User amendment: add shop.acme.com as additional in-scope target"
+}

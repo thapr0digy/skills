@@ -1,0 +1,20 @@
+{
+  "engagement_id": "fixture-d1",
+  "created_at": "2026-05-07T14:00:00Z",
+  "phases": [
+    {"name": "recon-passive", "status": "complete", "started_at": "2026-05-07T14:05:00Z", "completed_at": "2026-05-07T14:32:00Z", "rerun_count": 0},
+    {"name": "recon-active", "status": "complete", "started_at": "2026-05-07T14:32:00Z", "completed_at": "2026-05-07T15:01:00Z", "rerun_count": 0},
+    {"name": "enum-web", "status": "in_progress", "started_at": "2026-05-07T15:01:00Z", "rerun_count": 1, "rerun_params": {"wordlist_size": "medium"}},
+    {"name": "enum-cloud", "status": "pending", "rerun_count": 0},
+    {"name": "prioritize", "status": "pending", "rerun_count": 0},
+    {"name": "scan-vuln", "status": "pending", "rerun_count": 0}
+  ],
+  "conditional_phases": [
+    {"name": "enum-cloud", "status": "unlocked", "unlock_when": "cloud assets fingerprinted", "insert_before": "prioritize"},
+    {"name": "attack-ad", "status": "locked", "unlock_when": "AD services fingerprinted", "insert_before": "post-exploit"}
+  ],
+  "final_phases": [
+    {"name": "finding-write", "status": "pending"},
+    {"name": "pentest-export", "status": "pending"}
+  ]
+}

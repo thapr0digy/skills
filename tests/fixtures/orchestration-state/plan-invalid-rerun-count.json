@@ -1,0 +1,7 @@
+{
+  "engagement_id": "x",
+  "created_at": "2026-05-07T14:00:00Z",
+  "phases": [{"name": "recon-passive", "status": "pending", "rerun_count": 10}],
+  "conditional_phases": [],
+  "final_phases": []
+}

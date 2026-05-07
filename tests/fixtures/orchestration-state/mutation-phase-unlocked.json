@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-05-07T15:30:00Z",
+  "source": "supervisor",
+  "actor": "pentest-supervisor",
+  "mutation_kind": "phase_unlocked",
+  "before": {"name": "enum-cloud", "status": "locked"},
+  "after": {"name": "enum-cloud", "status": "unlocked", "insert_before": "prioritize"},
+  "reason": "S3 bucket discovered at acme.com:443; cloud assets fingerprinted criterion satisfied"
+}
