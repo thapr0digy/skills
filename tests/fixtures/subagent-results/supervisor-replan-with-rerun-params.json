@@ -1,0 +1,24 @@
+{
+  "verdict": "replan",
+  "reasons": ["enum-web coverage too shallow on shop.acme.com — needs medium wordlist + slower rate"],
+  "quality_assessment": {
+    "coverage_pct": 60,
+    "depth_score": 4,
+    "gaps": ["Only 17 paths tested per host; default wordlist insufficient"]
+  },
+  "required_actions": [
+    {
+      "action": "rerun_phase",
+      "phase": "enum-web",
+      "reason": "Medium wordlist with slower rate to avoid WAF",
+      "targets": ["shop.acme.com"],
+      "rerun_params": {
+        "wordlist_size": "medium",
+        "request_rate_multiplier": 0.5,
+        "additional_targets": ["api.acme.com"],
+        "extra_flags": ["-recursion", "-recursion-depth=2"]
+      }
+    }
+  ],
+  "halt_reason": null
+}
