@@ -48,6 +48,14 @@ assert "allowed source → exit 0 silent" '[ "$rc" = "0" ] && [ -z "$out" ]'
 run_inactive "$FIXDIR/webfetch-in-scope.json"
 assert "no engagement → exit 0 silent" '[ "$rc" = "0" ] && [ -z "$out" ]'
 
+# Case 5: userinfo bypass attempt → must still deny (in-scope host)
+run_active "$FIXDIR/webfetch-userinfo-bypass.json"
+assert "userinfo URL → exit 2 (deny)" '[ "$rc" = "2" ]'
+
+# Case 6: trailing dot bypass attempt → must still deny
+run_active "$FIXDIR/webfetch-trailing-dot-bypass.json"
+assert "trailing-dot URL → exit 2 (deny)" '[ "$rc" = "2" ]'
+
 rm -rf "$WORK"
 
 if [ "$FAILS" -gt 0 ]; then

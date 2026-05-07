@@ -1,0 +1,5 @@
+{
+  "hook_event_name": "PreToolUse",
+  "tool_name": "WebFetch",
+  "tool_input": {"url": "https://decoy:443@example.com/admin", "prompt": "x"}
+}

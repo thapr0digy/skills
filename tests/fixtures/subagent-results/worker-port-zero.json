@@ -1,0 +1,11 @@
+{
+  "phase": "enum-web",
+  "batch_id": "batch-x",
+  "worker_id": "worker-x",
+  "status": "ok",
+  "targets_processed": ["acme.com"],
+  "artifacts": [],
+  "services_discovered": [{"host": "acme.com", "port": 0, "product": "weird"}],
+  "errors": [],
+  "duration_seconds": 1.0
+}

@@ -37,9 +37,10 @@ jsonschema.validate(inst, schema)
 }
 
 # Worker-result schema
-assert_valid   "worker-ok validates"        "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-ok.json"
-assert_valid   "worker-blocked validates"   "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-blocked.json"
-assert_invalid "worker-invalid rejected"    "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-invalid.json"
+assert_valid   "worker-ok validates"                  "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-ok.json"
+assert_valid   "worker-blocked validates"             "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-blocked.json"
+assert_invalid "worker-invalid rejected"              "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-invalid.json"
+assert_invalid "worker-port-zero rejected"            "$SCHEMA_DIR/worker-result.schema.json"      "$FIX_DIR/worker-port-zero.json"
 
 # Supervisor-verdict schema
 assert_valid   "supervisor-proceed validates"  "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-proceed.json"
