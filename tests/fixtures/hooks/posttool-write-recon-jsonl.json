@@ -1,0 +1,6 @@
+{
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {"file_path": "/tmp/fixture-active-output/recon/active/services.jsonl"},
+  "tool_response": {"success": true}
+}
