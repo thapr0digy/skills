@@ -74,6 +74,15 @@ run_capture active "$backtick_fixture"
 assert "nmap in backticks → exit 2" '[ "$rc" = "2" ]'
 assert "nmap in backticks → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
 
+# --- Case 5b: active engagement but data files missing → must deny (fail-closed) ---
+# Override PENTEST_CORE_SHARED to a non-existent directory
+missing_data_fixture="$FIXDIR/bash-tool-pentest-denied.json"
+out=$(ACTIVE_ENGAGEMENT_LINK="$WORK/active-engagement" PENTEST_CORE_SHARED="$WORK/no-such-shared" bash "$HOOK" < "$missing_data_fixture" 2>/dev/null)
+rc=$?
+assert "active + missing data files → exit 2 (fail-closed)" '[ "$rc" = "2" ]'
+assert "active + missing data files → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
+assert "active + missing data files → reason mentions unreachable" 'printf "%s" "$out" | jq -r ".hookSpecificOutput.permissionDecisionReason" | grep -qi "unreachable"'
+
 # --- Case 7: nmap with surrounding tabs/newlines — matched_tool must be clean "nmap" ---
 # Ensures tr -cd 'a-zA-Z0-9_-' strips whitespace so jq gets a clean tool name
 whitespace_fixture="$WORK/whitespace.json"
