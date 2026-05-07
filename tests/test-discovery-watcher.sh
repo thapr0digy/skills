@@ -87,6 +87,23 @@ else
   FAILS=$((FAILS + 1))
 fi
 
+# --- File larger than 10 MB → hook silently skips (size cap) ---
+mkdir -p "$OUT/research/_dispatched" "$OUT/recon/active"
+rm -f "$OUT/research/_pending.jsonl"
+large_file="$OUT/recon/active/large.jsonl"
+# Create an 11 MB file (11 * 1024 * 1024 = 11 534 336 bytes)
+dd if=/dev/zero bs=1024 count=11264 2>/dev/null | tr '\0' 'x' > "$large_file"
+large_input=$(jq -nc --arg p "$large_file" \
+  '{hook_event_name:"PostToolUse", tool_name:"Write", tool_input:{file_path:$p}, tool_response:{success:true}}')
+printf '%s' "$large_input" | ACTIVE_ENGAGEMENT_LINK="$WORK/active-engagement" bash "$HOOK"
+if [ ! -f "$OUT/research/_pending.jsonl" ]; then
+  echo "PASS: >10 MB file skipped by size cap"
+else
+  echo "FAIL: hook processed a file exceeding the size cap"
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$large_file"
+
 # --- Symlink under recon/ pointing outside ACTIVE_OUTPUT_DIR → must not queue ---
 # Create a target file outside the output dir and a symlink inside recon/ pointing at it
 outside_target="$WORK/outside-target.jsonl"
