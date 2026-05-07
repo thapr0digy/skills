@@ -74,6 +74,17 @@ run_capture active "$backtick_fixture"
 assert "nmap in backticks → exit 2" '[ "$rc" = "2" ]'
 assert "nmap in backticks → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
 
+# --- Case 7: nmap with surrounding tabs/newlines — matched_tool must be clean "nmap" ---
+# Ensures tr -cd 'a-zA-Z0-9_-' strips whitespace so jq gets a clean tool name
+whitespace_fixture="$WORK/whitespace.json"
+# Use jq so \t is decoded to a real tab character (raw tabs are invalid JSON)
+jq -rn '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"\t nmap \t -sV"}}' > "$whitespace_fixture"
+run_capture active "$whitespace_fixture"
+assert "nmap with tabs → exit 2" '[ "$rc" = "2" ]'
+assert "nmap with tabs → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
+# Reason string must contain the clean tool name "nmap", not raw whitespace chars
+assert "nmap with tabs → reason references clean tool name" 'printf "%s" "$out" | jq -r ".hookSpecificOutput.permissionDecisionReason" | grep -q "nmap"'
+
 rm -rf "$WORK"
 
 if [ "$FAILS" -gt 0 ]; then
