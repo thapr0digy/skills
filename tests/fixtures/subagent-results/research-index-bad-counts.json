@@ -1,0 +1,12 @@
+{
+  "host": "acme.com",
+  "port": 8080,
+  "product": "WordPress",
+  "version": "6.4.1",
+  "research_file": "research/acme.com_8080_WordPress_6.4.1.md",
+  "completed_at": "2026-05-07T14:30:00Z",
+  "status": "ok",
+  "cve_count": 999999999,
+  "exploit_count": 0,
+  "default_creds_found": false
+}

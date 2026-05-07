@@ -1,0 +1,11 @@
+{
+  "phase": "enum-web",
+  "batch_id": "batch-002",
+  "worker_id": "worker-2",
+  "status": "blocked",
+  "targets_processed": [],
+  "artifacts": [],
+  "services_discovered": [],
+  "errors": ["Bash deny: ffuf cannot run during recon-active phase"],
+  "duration_seconds": 1.2
+}

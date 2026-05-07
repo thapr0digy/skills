@@ -1,0 +1,11 @@
+{
+  "verdict": "halt",
+  "reasons": ["Something bad"],
+  "quality_assessment": {
+    "coverage_pct": 0,
+    "depth_score": 0,
+    "gaps": []
+  },
+  "required_actions": [],
+  "halt_reason": null
+}

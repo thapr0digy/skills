@@ -1,0 +1,8 @@
+{
+  "verdict": "proceed",
+  "reasons": ["fine"],
+  "quality_assessment": {"coverage_pct": 95, "depth_score": 8, "gaps": []},
+  "required_actions": [],
+  "halt_reason": null,
+  "notes": "this extra field violates additionalProperties:false"
+}

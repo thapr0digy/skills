@@ -1,0 +1,5 @@
+{
+  "hook_event_name": "PreToolUse",
+  "tool_name": "WebFetch",
+  "tool_input": {"url": "https://shop.example.com/products", "prompt": "fetch products"}
+}

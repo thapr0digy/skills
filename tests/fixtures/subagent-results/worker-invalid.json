@@ -1,0 +1,10 @@
+{
+  "phase": "enum-web",
+  "batch_id": "batch-003",
+  "status": "ok",
+  "targets_processed": [],
+  "artifacts": [],
+  "services_discovered": [],
+  "errors": [],
+  "duration_seconds": 0
+}
