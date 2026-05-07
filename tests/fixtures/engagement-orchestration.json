@@ -1,0 +1,34 @@
+{
+  "engagement_id": "fixture-orchestration",
+  "client_name": "Fixture Client",
+  "type": "external",
+  "dates": { "start": "2026-05-01", "end": "2026-05-21" },
+  "output_dir": "/tmp/engagements/fixture-orchestration",
+  "scope": {
+    "in_scope": [
+      { "type": "domain", "value": "example.com", "added_at": "2026-05-01T12:00:00Z" }
+    ],
+    "out_of_scope": []
+  },
+  "roe": {
+    "testing_windows": [],
+    "restricted_techniques": [],
+    "social_engineering_permitted": false,
+    "defense_evasion_permitted": false,
+    "rate_limits": {
+      "requests_per_second_per_target": 50,
+      "parallel_workers_per_phase": 4,
+      "parallel_research_workers": 3,
+      "scan_threads": 10,
+      "default_phase_deadline_seconds": 1800,
+      "research_worker_deadline_seconds": 300
+    }
+  },
+  "testers": [{ "handle": "fixture-tester", "name": "Fixture Tester" }],
+  "remote_hosts": {},
+  "emergency_contacts": [],
+  "tool_inventory": {},
+  "current_phase": null,
+  "last_supervised_at": null,
+  "status": "setup"
+}
