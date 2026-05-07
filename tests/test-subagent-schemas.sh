@@ -2,6 +2,15 @@
 # Validate subagent-result fixtures against their JSON schemas.
 
 set -u
+
+# Preflight: jsonschema must be importable. Without this, every assert_valid
+# would fail and every assert_invalid would pass vacuously, masking the real
+# problem (missing dependency).
+python3 -c "import jsonschema, json" 2>/dev/null || {
+  echo "FATAL: python3 + jsonschema not available. Install with: pip install jsonschema" >&2
+  exit 1
+}
+
 SCHEMA_DIR="plugins/pentest-core/skills/shared/schemas"
 FIX_DIR="tests/fixtures/subagent-results"
 FAILS=0
@@ -47,10 +56,12 @@ assert_valid   "supervisor-proceed validates"               "$SCHEMA_DIR/supervi
 assert_valid   "supervisor-replan validates"                "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-replan.json"
 assert_valid   "supervisor-halt validates"                  "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-halt.json"
 assert_invalid "supervisor-invalid rejected"                "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-invalid.json"
+assert_invalid "supervisor-extra-prop rejected"             "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-extra-prop.json"
 assert_valid   "supervisor-replan-with-rerun-params validates" "$SCHEMA_DIR/supervisor-verdict.schema.json" "$FIX_DIR/supervisor-replan-with-rerun-params.json"
 
 # Research-index schema
-assert_valid   "research-index-ok validates"   "$SCHEMA_DIR/research-index.schema.json"     "$FIX_DIR/research-index-ok.json"
+assert_valid   "research-index-ok validates"          "$SCHEMA_DIR/research-index.schema.json"     "$FIX_DIR/research-index-ok.json"
+assert_invalid "research-index-bad-counts rejected"   "$SCHEMA_DIR/research-index.schema.json"     "$FIX_DIR/research-index-bad-counts.json"
 
 if [ "$FAILS" -gt 0 ]; then
   echo ""
