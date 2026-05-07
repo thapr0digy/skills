@@ -1,0 +1,9 @@
+{
+  "verdict": "replan",
+  "reasons": ["S3 endpoint discovered"],
+  "quality_assessment": {"coverage_pct": 80, "depth_score": 7, "gaps": ["enum-cloud not yet run"]},
+  "required_actions": [
+    {"action": "unlock_conditional", "phase": "enum-cloud", "reason": "cloud assets fingerprinted criterion satisfied"}
+  ],
+  "halt_reason": null
+}

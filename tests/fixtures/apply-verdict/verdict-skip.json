@@ -1,0 +1,9 @@
+{
+  "verdict": "replan",
+  "reasons": ["scan-vuln redundant given findings"],
+  "quality_assessment": {"coverage_pct": 85, "depth_score": 7, "gaps": []},
+  "required_actions": [
+    {"action": "skip_phase", "phase": "scan-vuln", "reason": "all candidates already exploited in enum-web"}
+  ],
+  "halt_reason": null
+}

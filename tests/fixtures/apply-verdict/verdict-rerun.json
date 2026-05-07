@@ -1,0 +1,10 @@
+{
+  "verdict": "replan",
+  "reasons": ["enum-web wordlist insufficient"],
+  "quality_assessment": {"coverage_pct": 60, "depth_score": 4, "gaps": ["only 17 paths tested"]},
+  "required_actions": [
+    {"action": "rerun_phase", "phase": "enum-web", "reason": "medium wordlist required",
+     "rerun_params": {"wordlist_size": "medium", "request_rate_multiplier": 0.5}}
+  ],
+  "halt_reason": null
+}

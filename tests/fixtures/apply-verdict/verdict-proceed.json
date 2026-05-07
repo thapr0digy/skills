@@ -1,0 +1,7 @@
+{
+  "verdict": "proceed",
+  "reasons": ["all good"],
+  "quality_assessment": {"coverage_pct": 90, "depth_score": 8, "gaps": []},
+  "required_actions": [],
+  "halt_reason": null
+}

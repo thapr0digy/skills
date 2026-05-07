@@ -1,0 +1,9 @@
+{
+  "verdict": "replan",
+  "reasons": ["still failing"],
+  "quality_assessment": {"coverage_pct": 50, "depth_score": 3, "gaps": []},
+  "required_actions": [
+    {"action": "rerun_phase", "phase": "enum-web", "reason": "third attempt"}
+  ],
+  "halt_reason": null
+}
