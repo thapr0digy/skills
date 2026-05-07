@@ -58,6 +58,22 @@ assert "nmap, no engagement → exit 0" '[ "$rc" = "0" ]'
 assert "nmap, no engagement → additionalContext warn" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.additionalContext" >/dev/null'
 assert "nmap, no engagement → no permissionDecision" 'printf "%s" "$out" | jq -e ".hookSpecificOutput | has(\"permissionDecision\") | not" >/dev/null'
 
+# --- Case 5: nmap inside $() — command-substitution evasion → should deny ---
+cmd_sub_fixture="$WORK/cmd-sub.json"
+# Use jq to build the fixture so the shell doesn't interpret $() or backticks
+jq -rn '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"foo $(nmap -sV) bar"}}' > "$cmd_sub_fixture"
+run_capture active "$cmd_sub_fixture"
+assert "nmap in \$(…) → exit 2" '[ "$rc" = "2" ]'
+assert "nmap in \$(…) → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
+
+# --- Case 6: nmap inside backticks — command-substitution evasion → should deny ---
+backtick_fixture="$WORK/backtick.json"
+# Use jq to build the fixture so backticks are not interpreted by bash
+jq -rn '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"foo `nmap -sV` bar"}}' > "$backtick_fixture"
+run_capture active "$backtick_fixture"
+assert "nmap in backticks → exit 2" '[ "$rc" = "2" ]'
+assert "nmap in backticks → deny verdict" 'printf "%s" "$out" | jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" >/dev/null'
+
 rm -rf "$WORK"
 
 if [ "$FAILS" -gt 0 ]; then
