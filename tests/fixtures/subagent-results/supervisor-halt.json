@@ -1,0 +1,11 @@
+{
+  "verdict": "halt",
+  "reasons": ["Worker batch 4 attempted target outside scope.in_scope"],
+  "quality_assessment": {
+    "coverage_pct": 60,
+    "depth_score": 5,
+    "gaps": ["Scope violation aborts engagement"]
+  },
+  "required_actions": [],
+  "halt_reason": "scope_violation"
+}

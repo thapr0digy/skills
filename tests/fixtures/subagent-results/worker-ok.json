@@ -1,0 +1,13 @@
+{
+  "phase": "enum-web",
+  "batch_id": "batch-001",
+  "worker_id": "worker-1",
+  "status": "ok",
+  "targets_processed": ["acme.com"],
+  "artifacts": ["enum/web/acme.com/dirs.json"],
+  "services_discovered": [
+    {"host": "acme.com", "port": 8080, "product": "WordPress", "version": "6.4.1"}
+  ],
+  "errors": [],
+  "duration_seconds": 412.5
+}

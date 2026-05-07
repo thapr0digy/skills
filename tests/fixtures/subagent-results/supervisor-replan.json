@@ -1,0 +1,17 @@
+{
+  "verdict": "replan",
+  "reasons": ["S3 bucket discovered during enum-web → unlock enum-cloud"],
+  "quality_assessment": {
+    "coverage_pct": 82,
+    "depth_score": 7,
+    "gaps": ["enum-cloud not yet run despite S3 discovery"]
+  },
+  "required_actions": [
+    {
+      "action": "unlock_conditional",
+      "phase": "enum-cloud",
+      "reason": "AWS S3 endpoint discovered at acme.com:443"
+    }
+  ],
+  "halt_reason": null
+}
