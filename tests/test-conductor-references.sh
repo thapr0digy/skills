@@ -55,7 +55,10 @@ while IFS= read -r a; do
   [ -z "$a" ] && continue
   case "$a" in
     pentest-worker|pentest-supervisor|pentest-research) assert_agent "$a" ;;
-    *) echo "WARN: unknown subagent_type '$a' in SKILL.md" ;;
+    *)
+      echo "FAIL: unknown subagent_type '$a' in SKILL.md (not a known pentest agent)"
+      FAILS=$((FAILS + 1))
+      ;;
   esac
 done <<< "$agent_refs"
 
