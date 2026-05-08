@@ -61,6 +61,43 @@ run_check "$WORK/workers-artifact-fail"
 assert "bad-artifact batch → exit 1" '[ "$rc" = "1" ]'
 assert "bad-artifact batch → artifact_path violation" 'printf "%s" "$out" | grep -q "violation:artifact_path"'
 
+run_check_with_allowlist() {
+  local results_dir="$1"
+  out=$(ENGAGEMENT_JSON="$WORK/engagement.json" \
+        OUTPUT_DIR="$WORK/output" \
+        BATCH_ID="batch-T" \
+        WORKER_RESULTS_DIR="$results_dir" \
+        PHASE_TOOL_ALLOWLIST="$(pwd)/plugins/pentest-core/skills/shared/phase-tool-allowlist.json" \
+        bash "$HOOK" 2>&1)
+  rc=$?
+}
+
+# Scenario E: missing dispatch entry → check 3 violation
+mkdir -p "$WORK/workers-no-dispatch"
+patch_worker "$FIX/workers/worker-ok.json" "$WORK/workers-no-dispatch/worker-99.json"
+jq '.worker_id = "worker-99"' "$WORK/workers-no-dispatch/worker-99.json" > "$WORK/workers-no-dispatch/worker-99.json.tmp" && \
+  mv "$WORK/workers-no-dispatch/worker-99.json.tmp" "$WORK/workers-no-dispatch/worker-99.json"
+run_check "$WORK/workers-no-dispatch"
+assert "no-dispatch batch → exit 1" '[ "$rc" = "1" ]'
+assert "no-dispatch batch → dispatch_log violation" 'printf "%s" "$out" | grep -q "violation:dispatch_log"'
+
+# Scenario F: restricted technique mentioned → check 4 violation
+cp "$WORK/output/activity.log" "$WORK/output/activity.log.bak"
+echo '{"ts":"2026-05-07T15:02:00Z","tester":"x","event_type":"tool_call","batch_id":"batch-T","worker_id":"worker-1","phase":"enum-web","attempt_number":1,"command":"slowloris-DoS-attack -t target.com"}' >> "$WORK/output/activity.log"
+mkdir -p "$WORK/workers-restricted"
+patch_worker "$FIX/workers/worker-ok.json" "$WORK/workers-restricted/worker-1.json"
+run_check "$WORK/workers-restricted"
+assert "restricted-tech batch → exit 1" '[ "$rc" = "1" ]'
+assert "restricted-tech batch → restricted_technique violation" 'printf "%s" "$out" | grep -q "violation:restricted_technique"'
+mv "$WORK/output/activity.log.bak" "$WORK/output/activity.log"
+
+# Scenario G: tool not in phase allowlist → check 5 violation
+# sqlmap is in exploit-assist allowlist, NOT enum-web
+echo '{"ts":"2026-05-07T15:03:00Z","tester":"x","event_type":"tool_call","batch_id":"batch-T","worker_id":"worker-1","phase":"enum-web","attempt_number":1,"command":"sqlmap -u https://acme.com/login.php"}' >> "$WORK/output/activity.log"
+run_check_with_allowlist "$WORK/workers-restricted"
+assert "phase-allowlist batch → exit 1" '[ "$rc" = "1" ]'
+assert "phase-allowlist batch → phase_tool_allowlist violation" 'printf "%s" "$out" | grep -q "violation:phase_tool_allowlist"'
+
 rm -rf "$WORK"
 
 if [ "$FAILS" -gt 0 ]; then
