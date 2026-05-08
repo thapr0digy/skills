@@ -1,0 +1,7 @@
+{
+  "halt_reason": "user_abort",
+  "halted_at": "2026-05-07T17:00:00Z",
+  "halt_phase": "enum-web",
+  "supervisor_verdict": null,
+  "recovery_hint": "User created ABORT sentinel during enum-web. Inspect activity log around halted_at, then resume if intended."
+}

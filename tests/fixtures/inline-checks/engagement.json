@@ -1,0 +1,15 @@
+{
+  "engagement_id": "inline-check-fixture",
+  "output_dir": "/tmp/inline-checks-output",
+  "current_phase": "enum-web",
+  "scope": {
+    "in_scope": [
+      {"type": "domain", "value": "acme.com", "added_at": "2026-05-07T00:00:00Z"},
+      {"type": "domain", "value": "shop.acme.com", "added_at": "2026-05-07T00:00:00Z"}
+    ],
+    "out_of_scope": []
+  },
+  "roe": {
+    "restricted_techniques": ["DoS", "credential_theft"]
+  }
+}

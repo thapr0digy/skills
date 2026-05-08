@@ -1,0 +1,28 @@
+engagement_id: apply-fixture
+created_at: 2026-05-07T14:00:00Z
+phases:
+  - name: recon-passive
+    status: complete
+    started_at: 2026-05-07T14:05:00Z
+    completed_at: 2026-05-07T14:32:00Z
+    rerun_count: 0
+  - name: enum-web
+    status: in_progress
+    started_at: 2026-05-07T14:32:00Z
+    rerun_count: 0
+  - name: prioritize
+    status: pending
+    rerun_count: 0
+  - name: scan-vuln
+    status: pending
+    rerun_count: 0
+conditional_phases:
+  - name: enum-cloud
+    status: locked
+    unlock_when: cloud assets fingerprinted
+    insert_before: prioritize
+final_phases:
+  - name: finding-write
+    status: pending
+  - name: pentest-export
+    status: pending

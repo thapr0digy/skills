@@ -1,0 +1,6 @@
+{
+  "halted_at": "2026-05-07T16:00:00Z",
+  "halt_phase": "enum-web",
+  "supervisor_verdict": null,
+  "recovery_hint": "x"
+}

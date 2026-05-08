@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-05-07T15:30:00Z",
+  "source": "supervisor",
+  "actor": "pentest-supervisor",
+  "mutation_kind": "phase_unlocked",
+  "before": {},
+  "after": {}
+}

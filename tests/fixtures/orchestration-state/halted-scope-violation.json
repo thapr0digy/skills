@@ -1,0 +1,13 @@
+{
+  "halt_reason": "scope_violation",
+  "halted_at": "2026-05-07T16:00:00Z",
+  "halt_phase": "enum-web",
+  "supervisor_verdict": {
+    "verdict": "halt",
+    "reasons": ["Worker batch_id=batch-004 reported targets_processed=['out-of-scope.com']"],
+    "quality_assessment": {"coverage_pct": 40, "depth_score": 3, "gaps": ["Halted before completion due to scope breach"]},
+    "required_actions": [],
+    "halt_reason": "scope_violation"
+  },
+  "recovery_hint": "Inspect activity-log entries from batch_id=batch-004. Verify scope.in_scope is correct, then resume."
+}

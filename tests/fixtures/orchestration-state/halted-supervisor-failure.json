@@ -1,0 +1,13 @@
+{
+  "halt_reason": "supervisor_failure",
+  "halted_at": "2026-05-07T16:30:00Z",
+  "halt_phase": "scan-vuln",
+  "supervisor_verdict": {
+    "verdict": "halt",
+    "reasons": ["Conductor: supervisor returned unparseable JSON for batch-007"],
+    "quality_assessment": {"coverage_pct": 50, "depth_score": 5, "gaps": ["Halt before completion: supervisor failure"]},
+    "required_actions": [],
+    "halt_reason": "supervisor_failure"
+  },
+  "recovery_hint": "Supervisor returned malformed JSON for batch-007. Re-run scan-vuln after investigating supervisor input."
+}

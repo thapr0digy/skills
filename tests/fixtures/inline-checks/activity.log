@@ -1,0 +1,4 @@
+{"ts":"2026-05-07T15:00:00Z","tester":"x","event_type":"dispatch","batch_id":"batch-T","worker_id":"worker-1","phase":"enum-web","attempt_number":1,"action":"orchestration_dispatch"}
+{"ts":"2026-05-07T15:00:01Z","tester":"x","event_type":"dispatch","batch_id":"batch-T","worker_id":"worker-2","phase":"enum-web","attempt_number":1,"action":"orchestration_dispatch"}
+{"ts":"2026-05-07T15:00:30Z","tester":"x","event_type":"tool_call","batch_id":"batch-T","worker_id":"worker-1","phase":"enum-web","attempt_number":1,"action":"tool_call","command":"ffuf -u https://acme.com/FUZZ -w /opt/wordlists/common.txt"}
+{"ts":"2026-05-07T15:01:00Z","tester":"x","event_type":"tool_call","batch_id":"batch-T","worker_id":"worker-2","phase":"enum-web","attempt_number":1,"action":"tool_call","command":"gobuster dir -u https://shop.acme.com -w /opt/wordlists/common.txt"}
