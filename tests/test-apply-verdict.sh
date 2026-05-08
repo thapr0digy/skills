@@ -54,6 +54,18 @@ assert "rerun → enum-web.rerun_count=1" '[ "$(yq -r ".phases[] | select(.name 
 assert "rerun → enum-web.status=pending" '[ "$(yq -r ".phases[] | select(.name == \"enum-web\") | .status" <<< "$out")" = "pending" ]'
 assert "rerun → enum-web.rerun_params.wordlist_size=medium" '[ "$(yq -r ".phases[] | select(.name == \"enum-web\") | .rerun_params.wordlist_size" <<< "$out")" = "medium" ]'
 
+# Case 4b: rerun a phase mid-plan → downstream phases AND final_phases get invalidated
+cp "$FIX/plan-with-completed-downstream.yaml" "$WORK/p.yaml"
+# Verdict: rerun enum-web (phases[1]) — all downstream phases and final_phases should reset to pending
+run_apply "$WORK/p.yaml" "$FIX/verdict-rerun.json"
+assert "downstream rerun → exit 0" '[ "$rc" = "0" ]'
+assert "downstream rerun → enum-web reset to pending" '[ "$(yq -r ".phases[] | select(.name == \"enum-web\") | .status" <<< "$out")" = "pending" ]'
+assert "downstream rerun → prioritize timestamps cleared" '[ "$(yq -r ".phases[] | select(.name == \"prioritize\") | .completed_at" <<< "$out")" = "null" ]'
+assert "downstream rerun → scan-vuln status reset to pending" '[ "$(yq -r ".phases[] | select(.name == \"scan-vuln\") | .status" <<< "$out")" = "pending" ]'
+assert "downstream rerun → finding-write status reset to pending" '[ "$(yq -r ".final_phases[] | select(.name == \"finding-write\") | .status" <<< "$out")" = "pending" ]'
+assert "downstream rerun → finding-write timestamps cleared" '[ "$(yq -r ".final_phases[] | select(.name == \"finding-write\") | .completed_at" <<< "$out")" = "null" ]'
+assert "downstream rerun → pentest-export status reset to pending" '[ "$(yq -r ".final_phases[] | select(.name == \"pentest-export\") | .status" <<< "$out")" = "pending" ]'
+
 # Case 5: rerun exhausted (current=2, +1=3 → halt)
 cp "$FIX/plan-baseline.yaml" "$WORK/p.yaml"
 yq -yi '(.phases[] | select(.name == "enum-web")).rerun_count = 2' "$WORK/p.yaml"
