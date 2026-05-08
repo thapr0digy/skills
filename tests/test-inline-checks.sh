@@ -7,7 +7,7 @@ FIX="tests/fixtures/inline-checks"
 FAILS=0
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/test-ic.XXXXXX")
-mkdir -p "$WORK/output" "$WORK/workers-pass" "$WORK/workers-scope-fail" "$WORK/workers-artifact-fail"
+mkdir -p "$WORK/output" "$WORK/workers-pass" "$WORK/workers-scope-fail" "$WORK/workers-artifact-fail" "$WORK/workers-traversal-fail"
 
 jq --arg d "$WORK/output" '.output_dir = $d' "$FIX/engagement.json" > "$WORK/engagement.json"
 cp "$FIX/activity.log" "$WORK/output/activity.log"
@@ -27,6 +27,16 @@ cp "$FIX/workers/worker-out-of-scope.json" "$WORK/workers-scope-fail/worker-2.js
 
 # Scenario C: bad artifact (literal /etc/passwd, no rewrite)
 cp "$FIX/workers/worker-bad-artifact.json" "$WORK/workers-artifact-fail/worker-1.json"
+
+# Scenario D: relative-path traversal
+cat > "$WORK/workers-traversal-fail/worker-1.json" <<EOF
+{
+  "phase": "enum-web", "batch_id": "batch-T", "worker_id": "worker-1", "status": "ok",
+  "targets_processed": ["acme.com"],
+  "artifacts": ["../../../etc/passwd"],
+  "services_discovered": [], "errors": [], "duration_seconds": 30.0
+}
+EOF
 
 run_check() {
   local results_dir="$1"
@@ -60,6 +70,10 @@ assert "out-of-scope batch → scope_subset violation" 'printf "%s" "$out" | gre
 run_check "$WORK/workers-artifact-fail"
 assert "bad-artifact batch → exit 1" '[ "$rc" = "1" ]'
 assert "bad-artifact batch → artifact_path violation" 'printf "%s" "$out" | grep -q "violation:artifact_path"'
+
+run_check "$WORK/workers-traversal-fail"
+assert "traversal-path batch → exit 1" '[ "$rc" = "1" ]'
+assert "traversal-path batch → artifact_path violation cites traversal" 'printf "%s" "$out" | grep -q "parent-directory traversal"'
 
 run_check_with_allowlist() {
   local results_dir="$1"
