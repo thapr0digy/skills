@@ -52,6 +52,7 @@ assert_invalid "mutation-invalid-kind rejected"      "$SCHEMA_DIR/plan-mutation.
 
 assert_valid   "halted-scope-violation validates"    "$SCHEMA_DIR/halted-state.schema.json"    "$FIX_DIR/halted-scope-violation.json"
 assert_valid   "halted-supervisor-failure validates" "$SCHEMA_DIR/halted-state.schema.json"    "$FIX_DIR/halted-supervisor-failure.json"
+assert_valid   "halted-user-abort validates"        "$SCHEMA_DIR/halted-state.schema.json"    "$FIX_DIR/halted-user-abort.json"
 
 assert_valid   "complete-ok validates"               "$SCHEMA_DIR/complete-state.schema.json"  "$FIX_DIR/complete-ok.json"
 assert_invalid "complete-invalid-coverage rejected"  "$SCHEMA_DIR/complete-state.schema.json"  "$FIX_DIR/complete-invalid-coverage.json"
