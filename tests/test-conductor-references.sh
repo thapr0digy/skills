@@ -11,6 +11,13 @@ FAILS=0
 # Extract referenced paths from SKILL.md.
 script_refs=$(grep -oE 'plugins/pentest-core/skills/pentest-engage/scripts/[a-z-]+\.sh' "$SKILL" | sort -u)
 schema_refs=$(grep -oE 'plugins/pentest-core/skills/shared/schemas/[a-z-]+\.schema\.json' "$SKILL" | sort -u)
+# Also catch bare schema-name references (SKILL.md often references schemas by name without full path)
+bare_schema_refs=$(grep -oE '\b[a-z-]+\.schema\.json\b' "$SKILL" | sort -u | while read -r name; do
+  # Map to canonical path
+  echo "plugins/pentest-core/skills/shared/schemas/$name"
+done | sort -u)
+# Merge with full-path refs
+schema_refs=$(printf '%s\n%s' "$schema_refs" "$bare_schema_refs" | grep -v '^$' | sort -u)
 helper_md_refs=$(grep -oE 'plugins/pentest-core/skills/shared/[a-z-]+\.md' "$SKILL" | sort -u)
 allowlist_refs=$(grep -oE 'plugins/pentest-core/skills/shared/[a-z-]+\.json' "$SKILL" | sort -u)
 
