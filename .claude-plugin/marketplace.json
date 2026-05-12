@@ -48,64 +48,91 @@
       "name": "pentest-analysis",
       "version": "0.1.0",
       "description": "Target prioritization and attack surface analysis for penetration testing engagements. Synthesizes recon, enumeration, and scanning data to recommend high-value targets.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-analysis"
     },
     {
       "name": "pentest-scanning",
       "version": "0.1.0",
       "description": "Vulnerability scanning and custom template generation for penetration testing engagements. Nuclei-based scanning with tech-stack-aware template selection and custom template creation.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-scanning"
     },
     {
       "name": "pentest-exploit",
       "version": "0.1.0",
       "description": "Exploitation guidance and credential attack skills for penetration testing engagements. Expert-assisted exploit selection, payload generation, and password spraying/cracking.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-exploit"
     },
     {
       "name": "pentest-postexploit",
       "version": "0.1.0",
       "description": "Active Directory attack chains and post-exploitation skills for penetration testing engagements. AD exploitation, privilege escalation, lateral movement, loot collection, and detection rule generation.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-postexploit"
     },
     {
       "name": "pentest-evasion",
       "version": "0.1.0",
       "description": "Defense evasion techniques for red team engagements. Payload obfuscation, AMSI/ETW bypass, LOLBins, process injection, C2 communications, and covering tracks. Entire plugin is RoE-gated.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-evasion"
     },
     {
       "name": "pentest-social",
       "version": "0.1.0",
       "description": "Social engineering skills for penetration testing engagements. Phishing campaign setup, email template generation, infrastructure configuration, and results parsing. RoE-gated.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-social"
     },
     {
       "name": "pentest-utility",
       "version": "0.1.0",
       "description": "Utility skills for penetration testing engagements. Finding report writing, engagement cleanup checklist generation, and remediation retesting.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-utility"
     },
     {
       "name": "pentest-methodology-guard",
       "version": "0.1.0",
       "description": "Hooks that enforce the pentest-* skill methodology during penetration testing engagements. Injects a methodology baseline at session start, a detailed phase-to-skill mapping when the user submits a pentest-related prompt, and a warn-level reminder when a known pentest tool binary is invoked via raw Bash without using the matching skill.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/pentest-methodology-guard"
     },
     {
       "name": "tmux-notify",
       "version": "0.1.0",
       "description": "Renames the active tmux window to a visible marker (⚠ CLAUDE) when Claude Code is waiting on user input, and restores the original name once you respond.",
-      "author": { "name": "thapr0digy" },
+      "author": {
+        "name": "thapr0digy"
+      },
       "source": "./plugins/tmux-notify"
+    },
+    {
+      "name": "dangerous-bash-guard",
+      "version": "0.1.0",
+      "description": "PreToolUse Bash hook that hard-blocks irreversible/system-destructive commands and prompts on history-rewriting + shared-state side-effects (git force-push, kubectl delete, terraform apply, gh pr merge, etc.). Designed to pair with bypassPermissions mode. Escape hatch: prefix with CLAUDE_ALLOW_DANGEROUS=1 (audit-logged).",
+      "author": {
+        "name": "thapr0digy"
+      },
+      "source": "./plugins/dangerous-bash-guard"
     }
   ]
 }

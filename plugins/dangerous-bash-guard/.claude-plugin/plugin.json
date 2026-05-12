@@ -1,0 +1,8 @@
+{
+  "name": "dangerous-bash-guard",
+  "version": "0.1.0",
+  "description": "PreToolUse hook that hard-blocks irreversible filesystem and system-destructive Bash commands (rm -rf /, dd to /dev/*, mkfs, fork bombs, sudo destructives) and prompts via permissionDecision: ask for history-rewriting and shared-state side effects (git force-push/reset --hard/filter-repo, gh pr merge/close, kubectl delete/apply, terraform apply/destroy, aws delete-* / s3 rb / s3 rm --recursive, docker volume rm). Designed for use under bypassPermissions mode to retain a one-keypress safety gate. Escape hatch: prefix with CLAUDE_ALLOW_DANGEROUS=1 (audit-logged to ~/.claude/dangerous-overrides.log).",
+  "author": {
+    "name": "thapr0digy"
+  }
+}
