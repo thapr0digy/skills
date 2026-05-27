@@ -1,0 +1,6 @@
+{
+  "name": "verify-spec",
+  "version": "0.1.0",
+  "description": "Reality-checks a freshly written spec or plan against actual code, docs, and API specs using parallel read-only research agents, then applies approved corrections.",
+  "author": { "name": "thapr0digy" }
+}
