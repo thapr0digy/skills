@@ -24,6 +24,12 @@ Then install individual plugins:
 | [secret-scan](plugins/secret-scan/) | Standalone secret scanning with trufflehog. Can append results to existing vuln-scan reports. |
 | [dep-graph](plugins/dep-graph/) | Scans a parent directory of git repos and generates an interactive D3.js dependency graph. |
 
+### Development Workflow
+
+| Plugin | Description |
+|--------|-------------|
+| [verify-spec](plugins/verify-spec/) | Reality-checks a freshly written spec/plan against code, docs, and API specs using parallel read-only agents, then applies approved corrections. Wired into the superpowers brainstorming/writing-plans pipeline. |
+
 ### Penetration Testing Suite
 
 A modular set of plugins covering the full offensive security engagement lifecycle, with built-in safety policies for sensitive data handling and credential validation.
