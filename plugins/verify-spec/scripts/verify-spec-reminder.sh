@@ -10,9 +10,11 @@ INPUT=$(cat)
 FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty')
 [ -z "$FILE" ] && exit 0
 
-# Only vault specs/plans. Exclude already-generated reality-check reports.
+# Only vault specs/plans. Exclude already-generated reality-check reports
+# (in either specs/ or plans/) so the hook never re-triggers on its own output.
 case "$FILE" in
-  */Documents/obsidian/superpowers/*/specs/*-reality-check.md) exit 0 ;;
+  */Documents/obsidian/superpowers/*/specs/*-reality-check.md|\
+  */Documents/obsidian/superpowers/*/plans/*-reality-check.md) exit 0 ;;
   */Documents/obsidian/superpowers/*/specs/*.md|\
   */Documents/obsidian/superpowers/*/plans/*.md) ;;
   *) exit 0 ;;
